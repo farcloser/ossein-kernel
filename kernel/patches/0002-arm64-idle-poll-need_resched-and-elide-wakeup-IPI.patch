@@ -1,0 +1,198 @@
+Subject: [PATCH] arm64: idle: poll TIF_NEED_RESCHED before parking, and elide the wakeup IPI
+
+arm64 does not define TIF_POLLING_NRFLAG, so an idle CPU is always considered
+parked and every remote wakeup must send a rescheduling IPI. On bare metal that
+IPI is cheap. Under a hypervisor it is not: the sender's ICC_SGI1R_EL1 write traps
+and the wakee's vCPU must be unparked by the host. On Apple Virtualization.framework
+that round trip costs ~6us, which is most of a pipe ping-pong:
+
+  perf bench sched pipe, 4 vCPU guest : 6.70 usecs/op, ~1 call-function IPI per op
+  the same pair forced onto one vCPU  : 0.84 usecs/op
+
+Define TIF_POLLING_NRFLAG and give the idle loop a bounded polling window before it
+parks. Both halves are needed and neither works alone:
+
+ - The flag alone changes nothing: default_idle_call() clears it via
+   current_clr_polling_and_test() immediately before arch_cpu_idle(), so the window
+   in which set_nr_if_polling() could elide an IPI is empty.
+ - A poll inside arch_cpu_idle() is too late for the same reason: polling has already
+   been cleared, so the waker sends the IPI regardless.
+
+So the poll goes in do_idle(), before cpuidle_idle_call(), while the bit is still set.
+There a remote try_to_wake_up() takes set_nr_if_polling(): it stores TIF_NEED_RESCHED
+and sends no IPI. The existing clear-then-recheck dance in default_idle_call() closes
+the race when the window expires -- once the bit is clear, wakers IPI again.
+
+arm64 polls with LDXR+WFE (__cmpwait_relaxed) rather than cpu_relax(): LDXR arms the
+exclusive monitor on the flags word and WFE parks until a store clears it, which is
+exactly the event being waited for. It burns no cycles yet wakes at store speed.
+Measured on VZ (out-of-tree microbenchmark): WFE is not trapped (~9ns/op, same as bare
+metal) and a WFE-parked CPU observes a remote store in ~108ns vs ~116ns for a spin.
+
+The poll runs with interrupts ENABLED (do_idle() calls in here with them masked, so
+they are enabled/disabled locally, mirroring cpu_idle_poll()). This is a correctness
+requirement, not a nicety: a masked IRQ is NOT a WFE wake event, so a masked-window
+poll leaves any device interrupt that lands mid-window (every virtio completion --
+fs, blk, net) pending until the next monitor store or event-stream kick, and the
+event stream period (~100us at 10kHz) is LONGER than the 50us window, so the wait
+was not even bounded by the deadline. MEASURED cost of the masked version on the
+virtio-fs path: fsbench open+fstat+close 839us/op with the masked window vs 554us
+with polling disabled -- +285us of pure added latency per round trip, ~half of it
+paid again on every one of the 3-4 FUSE round trips an open involves. With IRQs
+enabled the pending interrupt is taken instantly; if its handler wakes a task here,
+the recheck below observes TIF_NEED_RESCHED and ends the window. IPI elision for
+remote task wakeups (the point of this patch) is unaffected: those arrive as stores
+to the flags word and wake the WFE directly.
+
+The wait is bounded by the deadline check, kicked by the event stream
+(CONFIG_ARM_ARCH_TIMER_EVTSTREAM), by any store to the flags word, and by any
+interrupt. Past the window we fall through to the normal WFI park, so a genuinely
+idle VM still costs the host nothing; only bursty-idle CPUs pay a bounded poll.
+Tunable with idle_poll_ns=<n>; 0 restores upstream behaviour.
+
+This is the same mechanism upstream is converging on for arm64 (Ankur Arora's
+smp_cond_load_*_timeout() infrastructure plus a poll_idle()/haltpoll follow-on);
+this patch is the minimal form of it for a CONFIG_CPU_IDLE=n guest.
+
+Signed-off-by: ossein <ossein@localhost>
+
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -74,6 +74,7 @@
+ #define TIF_SECCOMP		11	/* syscall secure computing */
+ #define TIF_SYSCALL_EMU		12	/* syscall emulation active */
+ #define TIF_PATCH_PENDING	13	/* pending live patching update */
++#define TIF_POLLING_NRFLAG	14	/* idle is polling TIF_NEED_RESCHED */
+ #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+ #define TIF_FREEZE		19
+ #define TIF_RESTORE_SIGMASK	20
+@@ -107,6 +108,7 @@
+ #define _TIF_MTE_ASYNC_FAULT	(1 << TIF_MTE_ASYNC_FAULT)
+ #define _TIF_NOTIFY_SIGNAL	(1 << TIF_NOTIFY_SIGNAL)
+ #define _TIF_TSC_SIGSEGV	(1 << TIF_TSC_SIGSEGV)
++#define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
+ 
+ #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+ 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+--- a/include/linux/cpu.h
++++ b/include/linux/cpu.h
+@@ -173,6 +173,12 @@
+ bool cpu_in_idle(unsigned long pc);
+ 
+ void arch_cpu_idle(void);
++/*
++ * Optional: poll for TIF_NEED_RESCHED for a bounded window before parking, called
++ * from do_idle() while TIF_POLLING_NRFLAG is set (the window in which wakers can
++ * elide the resched IPI). Default is a no-op.
++ */
++void arch_cpu_idle_poll_window(void);
+ void arch_cpu_idle_prepare(void);
+ void arch_cpu_idle_enter(void);
+ void arch_cpu_idle_exit(void);
+--- a/kernel/sched/idle.c
++++ b/kernel/sched/idle.c
+@@ -77,6 +77,7 @@
+ }
+ 
+ /* Weak implementations for optional arch specific functions */
++void __weak arch_cpu_idle_poll_window(void) { }
+ void __weak arch_cpu_idle_prepare(void) { }
+ void __weak arch_cpu_idle_enter(void) { }
+ void __weak arch_cpu_idle_exit(void) { }
+@@ -349,6 +350,14 @@
+ 			tick_nohz_idle_restart_tick();
+ 			cpu_idle_poll();
+ 		} else {
++			/*
++			 * Poll for a bounded window BEFORE parking. This must run
++			 * here, while TIF_POLLING_NRFLAG is still set: that is the
++			 * only window in which a waker's set_nr_if_polling() can
++			 * elide the resched IPI. default_idle_call() clears the bit
++			 * before arch_cpu_idle(), after which wakers must IPI again.
++			 */
++			arch_cpu_idle_poll_window();
+ 			cpuidle_idle_call(got_tick);
+ 		}
+ 		got_tick = tick_nohz_idle_got_tick();
+--- a/arch/arm64/kernel/idle.c
++++ b/arch/arm64/kernel/idle.c
+@@ -4,6 +4,10 @@
+  */
+ 
+ #include <linux/cpu.h>
++#include <linux/sched/clock.h>
++#include <linux/thread_info.h>
++
++#include <asm/cmpxchg.h>
+ #include <linux/irqflags.h>
+ 
+ #include <asm/barrier.h>
+@@ -33,6 +37,68 @@
+ }
+ 
+ /*
++ * How long an idle CPU polls TIF_NEED_RESCHED before parking in WFI, in ns.
++ * 0 disables polling entirely (upstream behaviour). Tunable: idle_poll_ns=<n>.
++ */
++static unsigned long idle_poll_ns __read_mostly = 50000;	/* 50us */
++
++static int __init idle_poll_ns_setup(char *str)
++{
++	return kstrtoul(str, 0, &idle_poll_ns) ? 0 : 1;
++}
++__setup("idle_poll_ns=", idle_poll_ns_setup);
++
++/*
++ * Poll TIF_NEED_RESCHED for a bounded window instead of parking immediately.
++ *
++ * Called from do_idle() while TIF_POLLING_NRFLAG is still set, so a remote
++ * try_to_wake_up() takes the set_nr_if_polling() path: it stores TIF_NEED_RESCHED
++ * and sends NO resched IPI, because we have promised to notice the store. Under a
++ * hypervisor that promise is worth a lot -- an IPI is a sender SGI trap plus a wakee
++ * vCPU unpark (~6us on VZ), whereas the store lands in ~100ns.
++ *
++ * LDXR arms the exclusive monitor on the flags word and WFE parks until the monitor
++ * is cleared -- i.e. until someone STORES to it. That is precisely the wakeup we are
++ * waiting for, so this costs no cycles while waiting (unlike a cpu_relax() spin) yet
++ * wakes at store speed. MEASURED on VZ: WFE is not trapped (~9ns) and a WFE-parked
++ * CPU observes a remote store in ~108ns, equal to a spin (measured out-of-tree).
++ *
++ * The poll MUST run with interrupts ENABLED (do_idle() calls us with them masked,
++ * so enable/disable locally, mirroring cpu_idle_poll()). A masked IRQ is NOT a WFE
++ * wake event: with a masked window, a device interrupt landing mid-poll (every
++ * virtio completion: fs, blk, net) sat pending until the next monitor store or
++ * event-stream kick -- and the stream period (~100us at 10kHz) is LONGER than the
++ * 50us window, so the wait was not even deadline-bounded. MEASURED: the masked
++ * window cost virtio-fs +285us per open round trip (fsbench open+fstat+close
++ * 839us -> 554us with polling disabled). With IRQs on, a pending interrupt is
++ * taken instantly; if its handler wakes a task on this CPU, the recheck below
++ * observes TIF_NEED_RESCHED and ends the window.
++ *
++ * The wait is bounded by the deadline check, kicked by the event stream
++ * (CONFIG_ARM_ARCH_TIMER_EVTSTREAM), by any store to the flags word, and by any
++ * interrupt. Past the deadline we fall through to the normal WFI park, so a truly
++ * idle VM still costs the host nothing.
++ */
++void __cpuidle arch_cpu_idle_poll_window(void)
++{
++	unsigned long flags, end;
++
++	if (!idle_poll_ns)
++		return;
++
++	end = local_clock() + idle_poll_ns;
++
++	raw_local_irq_enable();
++	do {
++		flags = READ_ONCE(current_thread_info()->flags);
++		if (flags & (_TIF_NEED_RESCHED | _TIF_NEED_RESCHED_LAZY))
++			break;
++		__cmpwait_relaxed(&current_thread_info()->flags, flags);
++	} while (local_clock() < end);
++	raw_local_irq_disable();
++}
++
++/*
+  * This is our default idle handler.
+  */
+ void __cpuidle arch_cpu_idle(void)
