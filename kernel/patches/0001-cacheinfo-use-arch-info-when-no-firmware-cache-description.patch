@@ -1,0 +1,46 @@
+Subject: [PATCH] cacheinfo: use arch info when firmware describes no caches at all
+
+of_have_populated_dt() is of_property_present(of_root, "compatible"). A device
+tree whose root node carries no "compatible" property therefore reads as "no DT
+populated" even when of_root is fully populated and describes the whole machine.
+Apple's Virtualization.framework hands its Linux guests exactly such a tree.
+
+In that case cache_setup_properties() takes neither the DT nor the ACPI branch,
+so ret stays 0 and use_arch_info is never armed. cache_leaves_are_shared() then
+falls through to comparing fw_token, which is NULL for every leaf, and NULL ==
+NULL marks every cache as shared by every CPU. A 4-vCPU guest reports its L1
+data cache shared across all 4 CPUs, no size/id attributes, and no warning --
+detect_cache_attributes() returns success, so nothing indicates a problem.
+
+The scheduler consumes this: with no valid LLC, cpus_share_cache() is false, so
+wake_affine()/select_idle_sibling() cannot co-locate a synchronous wakeup pair.
+On a 2-vCPU guest, perf bench sched pipe costs ~6.7 usecs/op versus ~0.9 when
+the pair shares a CPU.
+
+Commit "cacheinfo: Correctly fallback to using clidr_el1's information" handles
+a DT that is present but advertises no cache properties. It does not handle a
+DT that does not register as present at all. Arm the arch fallback for that case
+too, so the clidr_el1 information is used.
+
+Signed-off-by: ossein <ossein@localhost>
+
+--- a/drivers/base/cacheinfo.c
++++ b/drivers/base/cacheinfo.c
+@@ -383,7 +383,16 @@
+ 		ret = cache_setup_acpi(cpu);
+ 
+ 	// Assume there is no cache information available in DT/ACPI from now.
+-	if (ret && use_arch_cache_info())
++	// This includes the case where the firmware describes no caches AT ALL:
++	// of_have_populated_dt() is of_property_present(of_root, "compatible"), so a
++	// DT whose root lacks a "compatible" property (e.g. the one Apple's
++	// Virtualization.framework hands its guests) reads as "no DT" here. Both
++	// branches above are then skipped, ret stays 0, use_arch_info is never armed,
++	// and cache_leaves_are_shared() falls through to comparing fw_token — which is
++	// NULL for every leaf, so NULL == NULL marks every cache shared by every CPU
++	// (a 4-vCPU guest reports its L1 shared across all 4). Arm the arch fallback
++	// for that case too, so the clidr_el1 information is used instead.
++	if ((ret || (!of_have_populated_dt() && acpi_disabled)) && use_arch_cache_info())
+ 		use_arch_info = true;
+ 
+ 	return ret;

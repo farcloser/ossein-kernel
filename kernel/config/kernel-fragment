@@ -1,0 +1,552 @@
+# ossein guest kernel: ALLOWLIST fragment (merged onto `make tinyconfig` = allnoconfig + size
+# defaults).
+# Turn ON only what a VZ virtio microVM + containers actually need.
+#
+# Verify the SHIPPED result with `just kernel-verify-config`. Never trust
+# the fragment alone (olddefconfig can still revert a line whose deps aren't met).
+#
+# Reference: Apple's curated microVM config is the checklist for "what a VZ Linux
+# guest needs". Every symbol here is one Apple also enables, unless marked
+# ossein-specific.
+
+# ======================================================================
+# CORE: what tinyconfig strips but any Linux userland/boot needs back.
+# ======================================================================
+
+# Build for SPEED, not size. tinyconfig sets CC_OPTIMIZE_FOR_SIZE (-Os), which would
+# silently regress the syscall/fork/exec hot paths we tune elsewhere. Force -O2.
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+
+# tinyconfig's NUMERIC trap — a whole class the golden cannot see (it records =y/=m only).
+# arm64 defaults NR_CPUS=512 (arch/arm64/Kconfig), and >256 force-selects CPUMASK_OFFSTACK:
+# every cpumask_var_t becomes a heap allocation instead of an on-stack word, and every mask
+# is 8 words walked instead of 1 — on scheduler/load-balancer paths, for CPU counts a VZ
+# guest can never reach (vCPUs are bounded by host cores; <=32 on all shipping Apple silicon).
+# At 64 a cpumask is ONE unsigned long, on the stack. (Apple pins 128, also under the trigger.)
+# Verify after a bump: CONFIG_CPUMASK_OFFSTACK must NOT appear in kernel-golden.
+CONFIG_NR_CPUS=64
+
+# EXPERT-gated `default y` trap (same shape as SLUB_TINY and -Os): our empty base answers "n"
+# to every prompt nobody names. Off = generic table CRC while the vCPU advertises hardware
+# crc32 (verified in /proc/cpuinfo Features). The consumer that matters is crc32c for
+# ext4/jbd2 metadata_csum — on by default for any fs made in-guest with mke2fs >= 1.47, so it
+# taxes every metadata update (buildkit cache). Costs a few KB.
+CONFIG_CRC_OPTIMIZATIONS=y
+
+# tinyconfig's OTHER speed-for-size trade (one layer deeper than -Os): SLUB_TINY deletes the
+# slab per-CPU lockless fastpath (kmem_cache_cpu), so EVERY kmalloc/kfree serializes on the
+# per-node list_lock shared by all vCPUs. Its own help text says "not recommended for systems
+# with more than 16MB RAM" — our VMs have 4GB. Only selectable because we set EXPERT.
+# MEASURED: perf bench sched messaging (hackbench — the canonical slab benchmark: 400
+# procs × socketpairs, an sk_buff alloc+free per message) 0.133s -> 0.084s, a 37% win, for
+# +65KB image and ~+2MB slab. Nothing else in the suite moves (pipe/syscall/futex/epoll/
+# memcpy all noise) because they do no per-op allocation.
+# When bumping the kernel, re-diff tiny.config for new *_TINY/size defaults.
+# CONFIG_SLUB_TINY is not set
+
+# Turning SLUB_TINY off un-suppresses SLUB_DEBUG (default y when !SLUB_TINY), which drags in
+# STACKDEPOT + STACKTRACE. It is debug-only infrastructure — inert at runtime unless you boot
+# slub_debug= — and this is an allowlist: nothing rides in unnamed. Off; re-add locally
+# (with slub_debug=FZP) to chase slab corruption.
+# CONFIG_SLUB_DEBUG is not set
+
+# --- the tinyconfig BASE, named in full (build.sh enforces this) ---
+# kernel/configs/tiny.config is what we merge onto, and it is five lines — every one a
+# speed-for-size trade (-Os, SLUB_TINY, the NR_CPUS numeric, and the two below). build.sh
+# FAILS if any symbol tiny.config sets is not mentioned here, so a kernel bump that adds a
+# sixth cannot sneak it past us. The remaining two are decided here rather than inherited:
+#
+#   CONFIG_KERNEL_XZ — picks XZ from the "Kernel compression mode" choice. MOOT for us and
+#     left as-is: arm64's boot target is the raw uncompressed `Image` (see build.sh
+#     IMAGE_PATH=arch/arm64/boot/Image), which VZ loads directly. No CONFIG_KERNEL_* appears
+#     in the shipped golden at all — nothing decompresses anything. Revisit only if we ever
+#     ship Image.gz.
+#
+#   CONFIG_LD_DEAD_CODE_DATA_ELIMINATION — --gc-sections link-time dead-code removal.
+#     UNREACHABLE for us, not rejected: it `depends on HAVE_LD_DEAD_CODE_DATA_ELIMINATION`,
+#     which arm64 does not select. It is absent from the golden for that reason. Also worth
+#     noting it is size-oriented and marked EXPERIMENTAL — we would not want it anyway.
+#
+#   CONFIG_SLUB — the slab allocator itself. Correct and kept: it is the ONLY allocator
+#     upstream still has (SLAB/SLOB are gone). Only its TINY variant was the trap.
+
+# SMP — the VM runs 2+ vCPUs (RunSpec.CPUs default 2).
+CONFIG_SMP=y
+
+# Trim base features that don't earn their keep in a throwaway microVM:
+#   SWAP — no swap device is ever attached (tmpfs rootfs, no swap disk), so the whole
+#          swap path is dead code. MEMCG works fine without it.
+# CONFIG_SWAP is not set
+#
+# DEBUG_KERNEL can't be turned off here: EXPERT (required, [step 0] below) unconditionally
+# `select`s it to unhide debug options, so a `# ... is not set` line is futile — it always
+# comes back y. That's fine: DEBUG_KERNEL is only a menu gate, no code weight. What matters
+# is that no debug FEATURE under it (DEBUG_INFO, LOCKDEP, KASAN, …) rides in — the empty
+# base guarantees that, and verify-config.sh guards DEBUG_INFO as the representative.
+
+# Console + logging + PTYs (tinyconfig drops PRINTK → a silent, undebuggable boot).
+CONFIG_PRINTK=y
+CONFIG_TTY=y
+CONFIG_UNIX98_PTYS=y
+
+# Syscall surface glibc / the Go runtime / container runtimes assume exists.
+CONFIG_MULTIUSER=y
+CONFIG_SYSVIPC=y
+# FILE_LOCKING — fcntl()/flock() file locks. EXPERT-gated (default y, prompt only
+# under EXPERT) so the empty base drops it.
+# This is NOT optional.
+CONFIG_FILE_LOCKING=y
+# ADVISE_SYSCALLS — posix_fadvise/madvise/readahead. Also EXPERT-gated; lots of
+# software (databases, allocators, apt) advises the kernel and expects it to exist.
+CONFIG_ADVISE_SYSCALLS=y
+# BUG — sane BUG()/WARN() handling on kernel faults (EXPERT-gated default y).
+CONFIG_BUG=y
+# MEMBARRIER/RSEQ — glibc + Go runtime facilities (vminitd, buildkit, containerd are
+# Go); tiny, and absence forces slow fallbacks. Kept.
+CONFIG_MEMBARRIER=y
+CONFIG_RSEQ=y
+# NOT enabled — measured ~1 ns getpid regression, restored to Apple parity by dropping
+# them (2026-07-14). None is on the syscall path; the cost is code-growth shifting the
+# ThinLTO layout of the entry hot path (the "sub-2 ns getpid = layout, not a lever"
+# rule). All optional — the 9.3 MB parity kernel shipped without them:
+#   COMPACTION/MIGRATION — anti-fragmentation; nice under memory pressure, but the
+#                          kernel build (memory-heavy) ran fine without them.
+#   KALLSYMS             — symbol names in panic traces; debuggability only, biggest
+#                          Image/layout add. Re-add locally if you're chasing a panic.
+# CONFIG_COMPACTION is not set
+# CONFIG_MIGRATION is not set
+# CONFIG_KALLSYMS is not set
+
+# --- transparent huge pages: MEASURED AND REFUSED (2026-07-15) ---
+# THP=y + TRANSPARENT_HUGEPAGE_MADVISE looks like the biggest gap vs Apple's config (they
+# ship both), and it force-selects COMPACTION/MIGRATION above back in. Built it and measured
+# rather than argued, because the case for it rested on "the Go runtime madvise()s its heap
+# arenas" -- and that is FALSE on the Go we ship.
+#
+# madvise mode is OPT-IN: a region gets huge pages only if something calls
+# madvise(MADV_HUGEPAGE). Go 1.26.5, 768MB heap, every page touched (Rss 791MB):
+#   enabled=madvise -> AnonHugePages    2,048 kB   <- ONE huge page. 0.26% of the heap.
+#   enabled=always  -> AnonHugePages  790,528 kB   <- ~the whole heap
+# The always row is the control: the mechanism works perfectly, Go simply never asks. Since
+# everything we run is Go (containerd, buildkit, vminitd) or glibc malloc (gcc/node/python,
+# which needs glibc.malloc.hugetlb=1 to opt in), madvise mode is a measured NO-OP for this
+# stack. It would cost 208,896 bytes of image -- MORE than the 156 KB the whole 2026-07-15
+# config review saved -- to change nothing.
+#
+# enabled=always is a real mechanism but a different proposal, and not obviously a win:
+# interleaved A/B on THP's best case (dense 768MB first-touch) gave touch 66ms vs 129ms
+# (-49%, purely fewer faults: 196,608 4K faults -> 384 2M faults) but access 20ms vs 20ms --
+# NO measurable TLB benefit, because sequential access prefetches fine at 4K either way. So
+# the win is confined to first-touch of large dense allocations, which is not what a compile
+# does. Against that: a hard RAM cap and NO SWAP, where 2MB granularity on sparse mappings
+# bloats to OOM rather than to slowdown (untested -- the dense heap above barely moved Rss,
+# 791.7 -> 793.4 MB, which is exactly the case that CANNOT show the risk).
+# Revisit only with a real-build measurement that reports peak RSS alongside wall-clock.
+# Note the tmpfs angle if anyone does: container roots are tmpfs, and shmem THP is a separate
+# knob (shmem_enabled, defaults [never]) that the anon setting does not touch.
+# SHMEM — full shmem/tmpfs backing. Its prompt only appears under EXPERT (which we
+# set), so from an allnoconfig base it lands OFF and TMPFS silently reverts. Pin it.
+CONFIG_SHMEM=y
+CONFIG_POSIX_TIMERS=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_NO_HZ_IDLE=y
+# Tick rate: 250 Hz (arm64 default) — pinned as an explicit choice, not an omission. With
+# NO_HZ_IDLE the idle CPU is tickless anyway, so this only sets the busy-CPU tick.
+CONFIG_HZ_250=y
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
+CONFIG_EVENTFD=y
+CONFIG_SIGNALFD=y
+CONFIG_TIMERFD=y
+CONFIG_AIO=y
+CONFIG_IO_URING=y
+CONFIG_FHANDLE=y
+# inotify — file-change watching. tinyconfig drops it, but a huge range of container
+# workloads assume it (file watchers, tail -f, build tools, node/webpack, systemd).
+# Apple keeps it; we must too. (default y normally; named here since the base is empty.)
+CONFIG_INOTIFY_USER=y
+CONFIG_JUMP_LABEL=y
+CONFIG_KEYS=y
+
+# BPF_SYSCALL — the bpf() syscall + verifier/maps. NOT for seccomp (seccomp filters are
+# classic cBPF via SECCOMP_FILTER, already satisfied). REQUIRED for runc's cgroup2
+# device policy (an eBPF CGROUP_DEVICE program), which stock runc applies on every buildkit
+# `RUN` step — confirmed 2026-07-14: without it (and CGROUP_BPF, in the cgroup block below)
+# `RUN` dies with `bpf_prog_query(BPF_CGROUP_DEVICE) failed: invalid argument`. Not a cut.
+CONFIG_BPF_SYSCALL=y
+# NO BTF (DEBUG_INFO_BTF). BTF exists only for CO-RE eBPF tooling (bpftrace, cilium,
+# falco, libbpf apps that read /sys/kernel/btf/vmlinux) — seccomp-bpf above is classic
+# cBPF and needs none of it, and ossein has no in-guest eBPF consumer. BTF would add
+# ~1.5-5 MB to the Image (large for a ~10 MB kernel) plus the pahole/dwarves build dep,
+# and Apple's reference kernel omits it too. Re-enable ONLY if a guest container needs
+# CO-RE (fails looking for /sys/kernel/btf/vmlinux): CONFIG_DEBUG_INFO_BTF=y +
+# CONFIG_DEBUG_INFO=y here, and re-add `dwarves` to PACKAGES in build.sh.
+
+# Exec: real ELF binaries + #! scripts (without these the guest can't run anything).
+CONFIG_BINFMT_ELF=y
+CONFIG_BINFMT_SCRIPT=y
+
+# Block layer — required for virtio-blk (root initfs + buildkit cache) and ext4.
+CONFIG_BLOCK=y
+# One IO scheduler is enough for virtio-blk: mq-deadline (kept, the sane default). Kyber
+# (latency-tuned for fast NVMe) is a redundant second scheduler we never select.
+# CONFIG_MQ_IOSCHED_KYBER is not set
+# Named only to close the question, because "ro file-backed device, host already schedules ->
+# elevator=none" is a tempting cut that MEASURES AS NOTHING. A/B'd a full none-elevator kernel
+# against this one, 12 boots x 2 rounds: 0.490s vs 0.510s, then 0.490s vs 0.480s -- the sign
+# flips between rounds, so it is noise, and the .xz came out the same size (0 bytes saved).
+# The reason is structural, not marginal: the elevator only ever sees the 32MB read-only initfs
+# being read once at boot. Container roots are tmpfs and layers come over virtiofs, so no
+# workload IO reaches this queue at all. (Aside for whoever benchmarks vda directly: virtio-blk
+# reports rotational=1, so mq-deadline is seek-sorting a file on NVMe. Still didn't matter.)
+CONFIG_MQ_IOSCHED_DEADLINE=y
+
+# Networking core: IPv4/IPv6, AF_UNIX (dockerd/containerd/gRPC sockets), AF_PACKET.
+CONFIG_NET=y
+CONFIG_INET=y
+CONFIG_IPV6=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+# NETDEVICES — the `menuconfig` gate over ALL net drivers. Without it virtio-net,
+# veth and tun are unselectable (they silently revert). Named here, leaf drivers below.
+CONFIG_NETDEVICES=y
+# Empty default-y driver/subsystem MENUS that NET/NETDEVICES expose but a virtio-only guest
+# has ZERO drivers under (all leaves default n) — pure config noise, gated off at the menu:
+#   WLAN / WIRELESS  — no wifi.
+#   ETHERNET         — physical NIC driver menu; alone it gates ~69 NET_VENDOR_* stubs.
+#                      virtio-net/veth/bridge do NOT need it (the ethernet framework is
+#                      always-compiled net-core, not this driver menu).
+#   NETWORK_FILESYSTEMS — NFS/CIFS/etc.; we mount only ext4/overlay/tmpfs/virtio-fs.
+# None carries code we use; the drift check backstops a surprise force-select.
+# CONFIG_WLAN is not set
+# CONFIG_WIRELESS is not set
+# CONFIG_ETHERNET is not set
+# CONFIG_NETWORK_FILESYSTEMS is not set
+
+# Trim default-y symbols that rode in through the opened gates (TTY/NET/INET) — a headless
+# virtio-only microVM needs none of them. The post-olddefconfig drift check backstops these:
+# if any turns out force-selected on 7.x, the build FAILS loudly rather than silently shipping it.
+#   VT — no framebuffer/text virtual-terminal console (we use the PL011 serial console only);
+#        also drops the INPUT core it selects (no keyboard/mouse in VZ).
+#   IPV6_SIT — IPv6-in-IPv4 tunnel driver, unused.
+#   INET_DIAG — socket-diagnostics netlink (ss); no in-guest consumer.
+#   ETHTOOL_NETLINK — ethtool netlink iface (the classic ioctl path stays); no in-guest consumer.
+# CONFIG_VT is not set
+# CONFIG_IPV6_SIT is not set
+# CONFIG_INET_DIAG is not set
+# CONFIG_ETHTOOL_NETLINK is not set
+
+# ======================================================================
+# ARM64 PLATFORM — the devices the VZ "virt" machine actually presents.
+# ======================================================================
+
+# GICv3 interrupt controller + arch timer + PSCI (SMP secondary boot, power-off).
+CONFIG_ARM_GIC_V3=y
+CONFIG_ARM_GIC_V3_ITS=y
+CONFIG_ARM_ARCH_TIMER=y
+CONFIG_ARM_PSCI_FW=y
+CONFIG_POWER_RESET=y
+
+# PCI core — VZ presents virtio over PCI (generic ECAM host), so this is mandatory
+# even though we compile in NONE of the vendor host-controller drivers.
+CONFIG_PCI=y
+CONFIG_PCI_HOST_GENERIC=y
+CONFIG_PCI_MSI=y
+
+# Real-time clock the VZ machine exposes (PL031), so the guest boots with correct time.
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_DRV_PL031=y
+
+# Entropy: virtio-rng (host-seeded) so the guest CSPRNG is ready immediately.
+CONFIG_HW_RANDOM=y
+
+# ======================================================================
+# ossein CONTRACT — host<->guest control plane, storage, containers.
+# ======================================================================
+
+# --- single-purpose throwaway VM: no loadable modules, everything built-in ---
+# Fixed virtio-only hardware, known at build time. No loader, smaller image, less
+# attack surface. (tinyconfig already has MODULES off; pinned here as intent.)
+# CONFIG_MODULES is not set
+
+# --- host<->guest control plane: gRPC over vsock (the agent's lifeline) ---
+CONFIG_VSOCKETS=y
+CONFIG_VIRTIO_VSOCKETS=y
+
+# --- virtio transport + devices VZ exposes ---
+# VIRTIO_MENU is the `menuconfig` gate over the virtio TRANSPORTS (PCI/MMIO/balloon);
+# without it VIRTIO_PCI silently reverts even though the VIRTIO core is selected.
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_MENU=y
+CONFIG_VIRTIO_PCI=y
+# NOT the mmio transport: VZ exposes ZERO virtio-mmio devices — all six enumerate over PCI
+# ECAM (verified live: every /sys/bus/virtio/devices/* resolves under pci0000:00, and
+# /sys/bus/platform/devices has no virtio at all). This was an explicit `=y` here filed under
+# "transports VZ exposes", i.e. a false statement in the decision log — worse than an unnamed
+# default, because it looks audited.
+# CONFIG_VIRTIO_MMIO is not set
+CONFIG_VIRTIO_BLK=y
+CONFIG_VIRTIO_NET=y
+CONFIG_VIRTIO_CONSOLE=y
+CONFIG_VIRTIO_BALLOON=y
+CONFIG_HW_RANDOM_VIRTIO=y
+
+# --- root disk + virtio-fs shares + container fs ---
+CONFIG_EXT4_FS=y
+CONFIG_EXT4_FS_POSIX_ACL=y
+CONFIG_FUSE_FS=y
+CONFIG_VIRTIO_FS=y
+CONFIG_OVERLAY_FS=y
+CONFIG_TMPFS=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_TMPFS_XATTR=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_PROC_FS=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_SYSFS=y
+CONFIG_BINFMT_MISC=y
+# POSIX message queues — the `mqueue` filesystem is one of the OCI runtime's DEFAULT
+# mounts (/dev/mqueue), which stage2 mounts unconditionally for every container. No
+# workload here uses mqueues, but the mount is part of the runtime contract and a
+# missing fs makes container create fail with ENODEV. (devpts for /dev/pts comes
+# from UNIX98_PTYS above; /dev/shm from SHMEM+TMPFS.)
+CONFIG_POSIX_MQUEUE=y
+
+# --- containers: cgroup2 + namespaces + seccomp ---
+# Controllers kept: memory (OOM/accounting), pids (fork-bomb guard), cpuset. The
+# cpu/io controllers (BLK_CGROUP, CGROUP_SCHED, FAIR_GROUP_SCHED, CFS_BANDWIDTH) are
+# deliberately NOT enabled: the OCI spec ossein builds sets no Resources, so per-
+# container cpu/io *limits* are never enforced (RunSpec.CPUs/MemoryMiB size the VM,
+# not cgroups). Add them back only if we grow container-level --cpus/--memory.
+CONFIG_CGROUPS=y
+CONFIG_MEMCG=y
+CONFIG_CGROUP_PIDS=y
+CONFIG_CPUSETS=y
+# CGROUP_BPF — REQUIRED, not optional. On cgroup2 the DEVICE controller is an eBPF program
+# (BPF_PROG_TYPE_CGROUP_DEVICE); stock runc always applies a default device allowlist, so
+# without this every buildkit `RUN` step dies at container init with
+# `bpf_prog_query(BPF_CGROUP_DEVICE) failed: invalid argument` (confirmed 2026-07-14).
+# Needs BPF_SYSCALL (set above). There is no separate cgroup2 device CONFIG.
+CONFIG_CGROUP_BPF=y
+CONFIG_NAMESPACES=y
+CONFIG_UTS_NS=y
+CONFIG_IPC_NS=y
+CONFIG_PID_NS=y
+CONFIG_NET_NS=y
+CONFIG_USER_NS=y
+CONFIG_SECCOMP=y
+
+# --- container L2 plumbing only. NO in-guest netfilter: ossein does networking host-side
+# (gvisor-tap-vsock netstack) and containers share the VM's netns, so nothing in the guest
+# ever loads an nft/iptables rule. The old NETFILTER/NF_TABLES/NF_NAT/NF_CONNTRACK block was
+# provably inert (verified: NAT/family frontends absent + zero in-guest users) and is cut.
+# Re-add NF_TABLES + a NAT frontend (NFT_NAT/MASQ, NF_TABLES_IPV4) only if buildkit's in-VM
+# RUN steps ever need in-guest NAT.
+CONFIG_VETH=y
+CONFIG_TUN=y
+# BRIDGE cut (2026-07-16, with STP + LLC, which exist only to serve it). Proven inert, not
+# assumed: built a no-BRIDGE kernel and ran a buildkit build with network RUN steps
+# (apt-get update egress + getent DNS, across two fresh sandbox netns) — identical success to
+# the BRIDGE=y kernel. ossein does networking host-side (gvisor-tap-vsock) with containers
+# sharing the VM netns, so no in-guest path ever creates a bridge; buildkit's RUN sandbox does
+# not either. Saved 67,584 bytes. VETH/TUN are KEPT (runc netns setups / in-container VPNs are
+# plausible; unlike BRIDGE they were not shown dead). Re-add CONFIG_BRIDGE=y only if a nested
+# docker-in-docker or a custom `--network` build mode that bridges in-guest is ever needed.
+# CONFIG_BRIDGE is not set
+# CONFIG_STP is not set
+# CONFIG_LLC is not set
+
+# NOTE: no in-guest kernel crypto. ossein has no dm-crypt / kTLS / IPsec / module
+# signing, and Go does its crypto in userspace — so the CONFIG_CRYPTO subsystem and
+# the ARMv8 CE algorithms are intentionally NOT enabled (they'd need KERNEL_MODE_NEON
+# + the full crypto core for zero benefit). CRYPTO_LIB_SHA256_ARCH stays on because
+# it's auto-selected by lib/ code, but that's incidental, not a dependency we assert.
+
+# --- VZ platform serial console ---
+CONFIG_SERIAL_AMBA_PL011=y
+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+
+# --- default-y ride-alongs that entered through gates we opened (all verified shipped =y
+# --- and verified dead here; the drift check backstops any that turn out force-selected) ---
+# VIRTIO_PCI_LEGACY / _LIB_LEGACY — virtio 0.9 draft-device support; VZ is modern-only (1.x),
+#   so no legacy device can exist to drive it.
+# LEGACY_PTYS — obsolete BSD ptys; everything uses Unix98 (devpts), which we keep. Apple: off.
+# LEGACY_TIOCSTI — TIOCSTI injects characters into a tty's INPUT queue: a container with a tty
+#   can type into it. Upstream added this symbol precisely so it can be compiled out; it is a
+#   known escalation vector. Our VM boundary makes it non-critical, but it is free to cut and
+#   there is no reason to ship an input-injection ioctl in a container kernel.
+# VSOCKETS_DIAG — sock-diag for vsock. Identical argument to the INET_DIAG cut above ("no
+#   in-guest consumer"); it just rode in via default y instead of being named.
+# PCI_QUIRKS — workarounds for physical devices that cannot exist behind VZ's generic ECAM.
+# PCIEASPM — link power management on a virtual PCIe fabric.
+# VGA_ARB — VGA arbitration with no GPU (DRM is already off).
+# MSDOS_PARTITION / EFI_PARTITION — partition-table scanning; every disk we attach is a
+#   whole-device fs (root=/dev/vda, initfs.ext4, cache disks). Nothing we create is partitioned.
+#   Both are `bool "..." if PARTITION_ADVANCED` + `default y`: with the gate CLOSED there is no
+#   prompt, so a bare `is not set` is silently ignored and default y wins — the in-build drift
+#   check caught exactly that. Open the gate (it exposes only prompts, all other parsers are
+#   default n) so the two can actually be answered. Same shape as the VIRTIO_MENU/NETDEVICES
+#   gates above.
+# LDISC_AUTOLOAD — line-discipline MODULE autoload in a MODULES=n kernel. Meaningless.
+# CONFIG_VIRTIO_PCI_LEGACY is not set
+# CONFIG_LEGACY_PTYS is not set
+# CONFIG_LEGACY_TIOCSTI is not set
+# CONFIG_VSOCKETS_DIAG is not set
+# CONFIG_PCI_QUIRKS is not set
+# CONFIG_PCIEASPM is not set
+# CONFIG_VGA_ARB is not set
+CONFIG_PARTITION_ADVANCED=y
+# CONFIG_MSDOS_PARTITION is not set
+# CONFIG_EFI_PARTITION is not set
+# CONFIG_LDISC_AUTOLOAD is not set
+
+# --- embed config in the image so we can extract + verify what we shipped ---
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+
+# --- arm64 "Architecture features" menu ---
+# The SLUB_TINY trap again, and worse than the usual case: these are not even "if EXPERT"
+# prompts, just plain `bool "..."` + `default y`. allnoconfig answers "n" to ANY prompt, so an
+# empty base silently declines free hardware features. All three self-disable at boot via
+# cpufeature detection if the silicon (or VZ) lacks them -- the help text says so outright --
+# so naming them costs nothing on a core that does not implement them.
+#   TLB_RANGE (FEAT_TLBIRANGE, ARMv8.4) -- one range TLBI instead of a per-page TLBI loop on
+#     munmap/mprotect/COW teardown: malloc trim, Go GC scavenging, exec teardown.
+#   HW_AFDBM (FEAT_HAFDBS, ARMv8.1) -- hardware maintains page Access/Dirty bits; without it
+#     first-write-to-clean and page aging each take a minor fault.
+#   CNP -- TLB entries shareable between cores in the same inner-shareable domain.
+#
+# What VZ actually hands us, from the boot log ("CPU features: detected: ..."):
+#   TLB_RANGE -> "TLB range maintenance instructions"   ACTIVE
+#   CNP       -> "Common not Private translations"      ACTIVE
+#   HW_AFDBM  -> absent. Apple cores do not implement FEAT_HAFDBS, so it self-disables.
+#
+# HW_AFDBM is therefore kept KNOWING it is inert today, which looks like it contradicts the
+# rule that justifies ARM64_ERRATUM_* being off ("compiled in and permanently no-op'd -> off
+# is smaller and honest"). The difference is real, and checked rather than assumed:
+#   - An erratum can NEVER fire: it is MIDR-matched against Cortex/Neoverse parts, and an
+#     Apple core is not one. "Permanently" is literal.
+#   - HAFDBS is a standard architectural feature that a future host core may simply have. It
+#     is host-detected, not config-decided; naming it means the answer tracks the silicon.
+#   - The cost of being wrong is near-zero, verified in the 7.1.3 source rather than guessed:
+#     CONFIG_ARM64_HW_AFDBM does not appear in arch/arm64/include/asm/pgtable.h at all. Its
+#     only reachable uses here are a compile-time IS_ENABLED() in cpu_has_hw_af(), one-time
+#     TCR_EL1 bit setup in mm/proc.S, and cpufeature table entries. No per-fault path is
+#     gated on it (older kernels did gate a cmpxchg loop; 7.x does not), and the .xz did not
+#     change size. It buys a boot-time branch, not a hot-path tax.
+# Ride-alongs, both from HW_AFDBM and both inert for the same reason: ARM64_HAFT ("depends on
+# ARM64_HW_AFDBM", default y, ARMv8.9) and ARCH_HAS_NONLEAF_PMD_YOUNG ("select ... if
+# ARM64_HAFT"). The latter is what MGLRU would use for non-leaf aging, if LRU_GEN ever lands.
+CONFIG_ARM64_TLB_RANGE=y
+CONFIG_ARM64_HW_AFDBM=y
+CONFIG_ARM64_CNP=y
+
+# --- arch timer event stream (bounds WFE waits) ---
+# Required by kernel-patches/0002 (polling idle): the idle CPU parks in WFE waiting for a
+# store to its thread-flags word. The event stream kicks every WFE-parked CPU at ~10kHz, so
+# a poll window cannot overshoot its deadline even if the monitor event is missed. FEAT_WFxT
+# (WFET, precise timeout) would be the alternative but VZ masks it from the guest hwcaps.
+# Not a tick: it only gates WFE, so NO_HZ_IDLE residency is unaffected.
+CONFIG_ARM_ARCH_TIMER_EVTSTREAM=y
+
+# --- multi-core scheduler domain ---
+# tinyconfig leaves SCHED_MC off, which leaves PKG as the ONLY sched domain — and PKG is
+# built with 0*SD_SHARE_LLC (topology.c: SDTL_INIT(tl_pkg_mask, NULL, PKG) passes no
+# sd_flags). With no SD_SHARE_LLC domain anywhere, update_top_cache_domain() falls back to
+# `int size = 1`, so sd_llc_size == 1 and the load balancer has no LLC to balance within.
+# Kept for its own sake: it is worth ~20% on a context-switch-saturated workload (perf bench
+# sched messaging 0.164 -> 0.13 sec). It is NOT needed for wakeup latency — that is
+# kernel-patches/0002 (polling idle), which works with stock placement.
+CONFIG_SCHED_MC=y
+
+# ======================================================================
+# TUNING (each block below is a decision-log entry).
+# From a tinyconfig base most hardening is already off, but the symbols below
+# `default y` (some only once EXPERT is set), so we still pin them explicitly.
+# ======================================================================
+
+# [step 0] EXPERT — REQUIRED, or half of step 1 is a silent no-op. On arm64,
+# UNMAP_KERNEL_AT_EL0 (KPTI) and MITIGATE_SPECTRE_BRANCH_HISTORY have their prompt
+# gated `if EXPERT` with `default y`. Without EXPERT they are not user-settable, so
+# `make olddefconfig` DISCARDS the `is not set` lines below and restores default y.
+# Apple sets EXPERT=y and so must we; it also unlocks the wider trim surface.
+# Verify with `just kernel-verify-config` — never trust the fragment alone.
+CONFIG_EXPERT=y
+
+# [step 1] in-kernel arch hardening — irrelevant to a single-tenant throwaway VM
+# (the VM boundary is the containment). Several `default y`, so pin OFF explicitly.
+# INVARIANT: this is sound ONLY while 1 VM = 1 tenant, discarded after. Pooling/reusing a
+# VM across mutually-distrusting workloads (e.g. buildkit running third-party Dockerfiles)
+# would defend the in-VM container boundary with a deliberately-weakened kernel. Do not pool.
+#   PTR_AUTH(_KERNEL)/BTI : per-function codegen (paciasp/autiasp, bti pads) + PAC keys
+#   POE/GCS               : per-transition register state (POR_EL0 / GCSPR_EL0)
+#   MTE/SME               : unused arch extensions
+#   KPTI/BHB              : gated off at runtime by mitigations=off; cut here too
+#                           (needs EXPERT above to take effect)
+# CONFIG_ARM64_PTR_AUTH is not set
+# CONFIG_ARM64_PTR_AUTH_KERNEL is not set
+# CONFIG_ARM64_BTI is not set
+# CONFIG_ARM64_POE is not set
+# CONFIG_ARM64_GCS is not set
+# CONFIG_ARM64_MTE is not set
+# CONFIG_ARM64_SME is not set
+# CONFIG_UNMAP_KERNEL_AT_EL0 is not set
+# CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY is not set
+
+# [step 1b] stack canary — KEPT, unlike everything in step 1. The distinction is deliberate:
+# KPTI/PAC/BTI defend against a MALICIOUS tenant, which the single-tenant invariant says does
+# not exist. The stack canary is different in kind — it is a CORRECTNESS tool: it turns silent
+# kernel stack-buffer overflow into an immediate, loud panic instead of undefined behavior. A
+# throwaway VM benefits from that regardless of who the tenant is. STRONG = the distro-standard
+# coverage (any function with a stack array or an addr-taken local); on arm64 it uses a per-task
+# sysreg canary (STACKPROTECTOR_PER_TASK), the cheap variant.
+# MEASURED cost (2026-07-16), the real reason it is safe to keep:
+#   image      : +196,608 bytes (8,806,408 -> 9,003,016)
+#   runtime    : below noise on sched-pipe and syscall-basic; ~0.4% (1.5ns) on the mmap fault
+#                path, the one place with a protected call stack deep enough to see it at all.
+# The review's "~1% class" was pessimistic; the true cost is a fifth of that on the worst path
+# and nil elsewhere. If the 192 KB ever matters more than the safety net, this is a clean revert.
+CONFIG_STACKPROTECTOR=y
+CONFIG_STACKPROTECTOR_STRONG=y
+
+# [step 2] preemption model: PREEMPT_LAZY — the lightest model arm64 offers on 7.x
+# (7.x gates PREEMPT_NONE behind ARCH_NO_PREEMPT as part of the lazy-preemption
+# migration; forcing NONE means fighting an active deprecation for ~1-2ns on a
+# microbench — not worth it). Pin LAZY and disable the siblings.
+# MEASURED: full CONFIG_PREEMPT=y (what OrbStack ships) is a no-op here — perf bench
+# sched-pipe 6.728 vs 6.694 usecs/op, i.e. noise. Don't re-try it: it buys nothing on
+# wakeup latency and full preemption taxes every other path.
+CONFIG_PREEMPT_LAZY=y
+# CONFIG_PREEMPT is not set
+# CONFIG_PREEMPT_RT is not set
+# CONFIG_PREEMPT_DYNAMIC is not set
+
+# [step 3] 48-bit VA (4-level page tables). 52-bit VA (LPA2, 5-level) is for
+# huge-memory hosts; a container VM never needs it and the extra page-table level
+# taxes every translation. Apple builds 48-bit.
+CONFIG_ARM64_VA_BITS_48=y
+# CONFIG_ARM64_VA_BITS_52 is not set
+# 4 KB base pages — REQUIRED for Rosetta: amd64 containers run via binfmt/Rosetta, which
+# assumes x86 4 KB pages; a 16 KB experiment would silently break every amd64 container.
+# Correct-by-default, but pinned + guarded (verify-config) so it can't regress silently.
+CONFIG_ARM64_4K_PAGES=y
+
+# [step 4] stack-variable auto-init: NONE (Apple's choice). INIT_STACK_ALL_ZERO is
+# `default y` when the compiler supports -ftrivial-auto-var-init=zero — it zero-inits
+# EVERY automatic variable on EVERY call, a real per-call cost on hot paths. An
+# info-leak hardening we don't need (single-tenant throwaway VM). Pin NONE.
+CONFIG_INIT_STACK_NONE=y
+# CONFIG_INIT_STACK_ALL_PATTERN is not set
+# CONFIG_INIT_STACK_ALL_ZERO is not set
+
+# [step 5] ThinLTO — cross-TU inlining + better layout of the syscall/fork/exec/sched
+# paths. Requires the clang+lld toolchain (build.sh builds with the pinned clang-22 LLVM
+# release tarball via LLVM=1, so kconfig sees CC_IS_CLANG + LD_IS_LLD and this choice
+# is selectable; under gcc it reverts to LTO_NONE). Do NOT enable CFI_CLANG
+# (indirect-call checks = added cost). NOTE: measured NO syscall win vs gcc (within
+# noise) — KEPT deliberately (harmless, newer compiler + cross-TU inlining defensible),
+# not as a measured earner.
+# CONFIG_LTO_NONE is not set
+CONFIG_LTO_CLANG_THIN=y

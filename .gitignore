@@ -1,0 +1,17 @@
+# --- OS noise ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+*.swp
+*~
+
+# Scratch / work-in-progress files
+*.local
+WIP_*
+
+# Build output and Go artifacts (subprojects keep their own .gitignore too)
+/build
