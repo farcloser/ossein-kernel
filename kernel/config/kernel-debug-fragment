@@ -1,0 +1,53 @@
+# ossein guest kernel — DEBUG fragment. NOT shipped.
+#
+# kernel-fragment + in-guest observability. Build it alongside the ship kernel:
+#   just kernel-debug          -> build/kernel-arm64.debug
+#   OSSEIN_KERNEL=build/kernel-arm64.debug build/ossein run ...
+#
+# Why this exists: scheduler investigations need in-guest observability (CONFIG_SCHEDSTATS
+# for the wakeup counters, CONFIG_DEBUG_FS for /sys/kernel/debug/sched), but the ship kernel
+# should never carry debug surface. ossein-kernel takes --kernel-config, so building a
+# separate debug kernel costs nothing.
+#
+# Everything here is deliberately OFF in the ship kernel; see the ship fragment for why.
+
+# The recipe prepends the ship fragment via kernel/merge-fragments.sh, which DROPS every
+# ship line for a symbol named below before concatenating. Plain `cat ship debug` does not work:
+# it yields a fragment saying both "# CONFIG_KALLSYMS is not set" and "CONFIG_KALLSYMS=y", and
+# build.sh's post-olddefconfig drift check asserts every fragment line survived — so it fails,
+# correctly. Anything turned on here must therefore be a full override, not an append.
+
+# --- scheduler introspection ---
+# nr_wakeups_local/remote/migrate/affine_attempts in /proc/<pid>/sched, and the domain list
+# in /proc/schedstat. This is what proved wake_affine() was never being called. The counters sit
+# behind DEFINE_STATIC_KEY_FALSE(sched_schedstats) and are OFF at boot: /proc/<pid>/sched shows
+# no nr_wakeups lines until you arm it, which reads as a broken config if you don't expect it.
+# Arm with `schedstats=enable` on the cmdline, or at runtime (verified, both):
+#   echo 1 > /proc/sys/kernel/sched_schedstats     # the debian base image has no sysctl(8)
+CONFIG_SCHEDSTATS=y
+
+# --- debugfs ---
+# /sys/kernel/debug/sched/{features,domains}. CONFIG_SCHED_DEBUG no longer exists (upstream
+# made the sched debugfs unconditional), so DEBUG_FS is the only gate. NOTE: a container's
+# /sys is read-only, so mount it from the guest side or run --privileged.
+CONFIG_DEBUG_FS=y
+
+# --- symbols in traces ---
+# Cut from the ship kernel for a measured ~1ns getpid layout effect; here it is free and it is
+# the difference between a readable panic/perf trace and a wall of hex.
+CONFIG_KALLSYMS=y
+CONFIG_KALLSYMS_ALL=y
+
+# --- slab debugging ---
+# Off in ship (it rode in with SLUB_TINY's removal and cost 65KB for nothing). Here it is the
+# tool for slab corruption: boot with slub_debug=FZP.
+CONFIG_SLUB_DEBUG=y
+
+# --- in-guest perf events + ftrace ---
+# VZ exposes no PMU, so hardware events are unavailable either way — but SOFTWARE events
+# (context-switches, page-faults, task-clock) and tracepoints work, and `perf record`/
+# `perf sched` in-guest would have made both investigations dramatically cheaper.
+CONFIG_PERF_EVENTS=y
+CONFIG_FTRACE=y
+CONFIG_FUNCTION_TRACER=y
+CONFIG_DYNAMIC_FTRACE=y
