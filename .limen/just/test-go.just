@@ -96,7 +96,12 @@ profile: (_banner "test go" "profile")
         echo "  -> $png"
     }
     for pkg in $(go list ./...); do
-        name=${pkg##*/}
+        # Filename-safe name from the FULL import path, not just the last segment:
+        # example/a/client and example/b/client both end in "client" and would
+        # otherwise overwrite each other's binary and profiles. '/' -> '__'; the
+        # only other char a Go import path carries that matters here is '.', which
+        # is already filename-safe.
+        name=${pkg//\//__}
         echo "Profiling $pkg..."
         go test -count=1 -o "$prof/$name.test" "$pkg" \
             -cpuprofile "$prof/${name}_cpu.prof" \

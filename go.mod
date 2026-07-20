@@ -8,7 +8,7 @@ require (
 	github.com/diskfs/go-diskfs v1.9.3
 	github.com/google/go-containerregistry v0.21.7
 	github.com/insomniacslk/dhcp v0.0.0-20260603135910-a415979eb11e
-	github.com/mycophonic/primordium v0.5.0
+	github.com/mycophonic/primordium v0.6.0
 	github.com/mycophonic/xz v0.0.0-20260717033842-32d0a5de7cae
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/sys v0.47.0
@@ -36,5 +36,3 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 )
-
-replace github.com/mycophonic/primordium => ../../mycophonic/primordium
