@@ -50,6 +50,8 @@ github.com/mdlayher/packet v1.1.2 h1:3Up1NG6LZrsgDVn6X4L9Ge/iyRyxFEFD9o6Pr3Q1nQY
 github.com/mdlayher/packet v1.1.2/go.mod h1:GEu1+n9sG5VtiRE4SydOmX5GTwyyYlteZiFU+x0kew4=
 github.com/mdlayher/socket v0.4.1 h1:eM9y2/jlbs1M615oshPQOHZzj6R6wMT7bX5NPiQvn2U=
 github.com/mdlayher/socket v0.4.1/go.mod h1:cAqeGjoufqdxWkD7DkpyS+wcefOtmu5OQ8KuoJGIReA=
+github.com/mycophonic/primordium v0.6.0 h1:WPpkwUlc03RVMRzPYTHpHQmmfQLpIZmtKRmGiDkSCCg=
+github.com/mycophonic/primordium v0.6.0/go.mod h1:keJHCoNCC9syAbO+BTba1UUPSg0S3esd05zRQA5Adbw=
 github.com/mycophonic/xz v0.0.0-20260717033842-32d0a5de7cae h1:uXafdp3HZ07ZXIOQgvgZ41TlHd8sm4+nSKbIZQowfBw=
 github.com/mycophonic/xz v0.0.0-20260717033842-32d0a5de7cae/go.mod h1:Zm039yEFfN/DjznM2YfDgyQehENAzEnyw5jZVTexj20=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
