@@ -16,13 +16,15 @@
 #       (keyless cosign), and publishes.
 #
 #   just do release --local <cosign-key> vX.Y.Z [--cosign-password-stdin]
-#       The fully local lane: tag + goreleaser + key-based cosign from this
-#       machine. The key path is a mandatory argument; the passphrase is read
-#       from stdin with --cosign-password-stdin — piped, so it never lands in
-#       argv or shell history (`pass show cosign | just do release … --cosign-password-stdin`)
-#       — and prompted on the terminal when the flag is absent. For private
-#       repos (nothing touches Rekor's public log) — and the escape hatch when
-#       CI is down.
+#       The fully local lane: goreleaser + key-based cosign from this machine,
+#       and the SOLE publisher — it pushes the commit but not the tag, so it does
+#       not re-trigger the CI release workflow (goreleaser creates the GitHub
+#       release, and its remote tag, itself). The key path is a mandatory
+#       argument; the passphrase is read from stdin with --cosign-password-stdin —
+#       piped, so it never lands in argv or shell history (`pass show cosign |
+#       just do release … --cosign-password-stdin`) — and prompted on the terminal
+#       when the flag is absent. For private repos (nothing touches Rekor's public
+#       log) — and the escape hatch when CI is down.
 #
 #   just do release --local --dry-run
 #       Unsigned local snapshot into build/release/: no tag, no token, no
@@ -66,7 +68,7 @@ release *args:
             exit 2
         fi
     }
-    tag_and_push() {
+    ensure_signed_tag() {
         # Create the signed tag — unless it already exists pointing at HEAD, so
         # a retry after a failed publish resumes instead of failing here.
         if existing=$(git rev-parse -q --verify "refs/tags/$1^{commit}"); then
@@ -92,6 +94,14 @@ release *args:
         else
             git tag -s "$1" -m "$1"
         fi
+    }
+    # The DEFAULT (CI) lane's publish trigger: create the signed tag and push it.
+    # Pushing a v* tag is what starts the release workflow — this is the ONE event
+    # that owns publication in the CI lane. The --local lane, by contrast, pushes
+    # only HEAD (never the tag) so it does NOT re-trigger this workflow: exactly
+    # one publisher per release. See the --local lane below.
+    tag_and_push() {
+        ensure_signed_tag "$1"
         git push origin HEAD
         git push origin "refs/tags/$1"
     }
@@ -180,7 +190,17 @@ release *args:
             fi
             export COSIGN_KEY="$key"
             export COSIGN_PASSWORD="$password"
-            tag_and_push "$tag"
+            # Sole-publisher discipline: create the signed tag and push the COMMIT,
+            # but NOT the tag. goreleaser publishes the GitHub release itself (it
+            # only needs the tag locally — `validate` checks the working tree, not
+            # the remote — and creates the release, and its remote tag, through the
+            # API). Because no `git push` of a v* tag happens, the release workflow
+            # (on: push tags) never fires, so this machine is the only publisher —
+            # no race with a second, CI-driven GoReleaser. The signed tag stays
+            # local (the local lane is for private repos / a CI-down escape hatch);
+            # the default lane is the one that puts a signed tag on the remote.
+            ensure_signed_tag "$tag"
+            git push origin HEAD
             exec goreleaser release --clean
             ;;
         --ci)
