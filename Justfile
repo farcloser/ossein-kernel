@@ -59,8 +59,8 @@ all: kernel kernel-debug kernel-nopatch
 # ---------------------------------------------------------------------------
 
 # Pinned guest kernel source (passed explicitly to ossein-kernel). Latest stable.
-kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.3.tar.xz"
-kernel_source_sha256 := "be41c068e88f5242a19bccdbffbe077b18c47b45f627e2325504b4fab79dd1dc"
+kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz"
+kernel_source_sha256 := "22a0196b3cbcdf34dc27b77561f4d040585fd3447edc9ab3531a1ac79e3041e7"
 
 # Kernel build container (throwaway build VM only; nothing guest-facing), PINNED for
 # reproducibility on FOUR axes, ALL passed down to build.sh: the base image by DIGEST,
