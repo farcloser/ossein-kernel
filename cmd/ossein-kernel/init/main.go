@@ -34,7 +34,11 @@ import (
 )
 
 // version is stamped at build time (-X main.version) to match the shared go build task.
-var version = "dev" //nolint:gochecknoglobals // build-stamp target, per limen convention
+var version = "dev"
+
+// errNoEthernet reports that the virtio NIC never appeared. A package-level sentinel so
+// the boot path can match on it rather than on message text.
+var errNoEthernet = errors.New("no ethernet interface found")
 
 // initFailedStatus is written to /kernel/status when init itself fails before the
 // build's own exit code is available — distinguishes "init broke" from "build failed".
@@ -50,6 +54,20 @@ const (
 	// overlayMountpoint is the baked-in dir (see internal/rootfs) where the init mounts the
 	// tmpfs that backs the writable overlay root.
 	overlayMountpoint = "/ram"
+
+	// fsTmpfs is both the source and the fstype of every tmpfs in the base mount table.
+	fsTmpfs = "tmpfs"
+
+	// The two error shapes the mount and file paths repeat.
+	errFmtMkdir = "mkdir %s: %w"
+	errFmtOpen  = "open %s: %w"
+
+	// Modes for everything PID 1 creates. Deliberately world-readable: the guest's system
+	// directories must stay traversable by unprivileged processes (apt drops to _apt for
+	// downloads), and the host reads the log and status files back off the virtio-fs
+	// share. Note main sets umask 0, so these land verbatim.
+	dirMode  = 0o755
+	fileMode = 0o644
 )
 
 func main() {
@@ -129,8 +147,8 @@ func setupOverlayRoot() error {
 	newRoot := overlayMountpoint + "/root"
 
 	for _, d := range []string{lower, upper, work, newRoot} {
-		if err := os.Mkdir(d, 0o755); err != nil {
-			return fmt.Errorf("mkdir %s: %w", d, err)
+		if err := os.Mkdir(d, dirMode); err != nil {
+			return fmt.Errorf(errFmtMkdir, d, err)
 		}
 	}
 
@@ -145,8 +163,8 @@ func setupOverlayRoot() error {
 	}
 
 	oldRoot := newRoot + "/oldroot"
-	if err := os.Mkdir(oldRoot, 0o755); err != nil { // writable: lands in the overlay upper
-		return fmt.Errorf("mkdir %s: %w", oldRoot, err)
+	if err := os.Mkdir(oldRoot, dirMode); err != nil { // writable: lands in the overlay upper
+		return fmt.Errorf(errFmtMkdir, oldRoot, err)
 	}
 
 	if err := unix.PivotRoot(newRoot, oldRoot); err != nil {
@@ -173,28 +191,28 @@ type mountSpec struct {
 func mountBase() error {
 	// Order matters: parents before children. /dev is usually already mounted by the
 	// kernel (DEVTMPFS_MOUNT), so its mount tolerates EBUSY.
-	for _, m := range []mountSpec{
+	for _, spec := range []mountSpec{
 		{"proc", "/proc", "proc", 0, ""},
 		{"sysfs", "/sys", "sysfs", 0, ""},
 		{"devtmpfs", "/dev", "devtmpfs", 0, ""},
 		{"devpts", "/dev/pts", "devpts", 0, "gid=5,mode=620"},
-		{"tmpfs", "/dev/shm", "tmpfs", 0, ""},
-		{"tmpfs", "/run", "tmpfs", 0, ""},
-		{"tmpfs", "/tmp", "tmpfs", 0, ""},
+		{fsTmpfs, "/dev/shm", fsTmpfs, 0, ""},
+		{fsTmpfs, "/run", fsTmpfs, 0, ""},
+		{fsTmpfs, "/tmp", fsTmpfs, 0, ""},
 		// /kbuild is the build scratch: a real fs the guest kernel owns (NOT virtiofs —
 		// virtiofsd can't honour the guest root's DAC override). Sized by VM RAM.
-		{"tmpfs", "/kbuild", "tmpfs", 0, ""},
+		{fsTmpfs, "/kbuild", fsTmpfs, 0, ""},
 	} {
-		if err := os.MkdirAll(m.target, 0o755); err != nil {
-			return fmt.Errorf("mkdir %s: %w", m.target, err)
+		if err := os.MkdirAll(spec.target, dirMode); err != nil {
+			return fmt.Errorf(errFmtMkdir, spec.target, err)
 		}
 
-		if err := unix.Mount(m.source, m.target, m.fstype, m.flags, m.data); err != nil {
-			if m.target == "/dev" && err == unix.EBUSY {
+		if err := unix.Mount(spec.source, spec.target, spec.fstype, spec.flags, spec.data); err != nil {
+			if spec.target == "/dev" && errors.Is(err, unix.EBUSY) {
 				continue // kernel already mounted devtmpfs
 			}
 
-			return fmt.Errorf("mount %s on %s: %w", m.fstype, m.target, err)
+			return fmt.Errorf("mount %s on %s: %w", spec.fstype, spec.target, err)
 		}
 	}
 
@@ -223,8 +241,8 @@ func mountShares() error {
 
 // mountVirtiofs mounts a virtio-fs share (addressed by tag, set host-side in internal/vm).
 func mountVirtiofs(tag, target string) error {
-	if err := os.MkdirAll(target, 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", target, err)
+	if err := os.MkdirAll(target, dirMode); err != nil {
+		return fmt.Errorf(errFmtMkdir, target, err)
 	}
 
 	if err := unix.Mount(tag, target, "virtiofs", 0, ""); err != nil {
@@ -310,24 +328,29 @@ func findEthernet() (netlink.Link, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("no ethernet interface found")
+	return nil, errNoEthernet
 }
 
 func writeResolvConf(servers []net.IP) error {
-	var b strings.Builder
+	var builder strings.Builder
 	for _, s := range servers {
-		b.WriteString("nameserver " + s.String() + "\n")
+		// strings.Builder.WriteString is documented never to fail.
+		_, _ = builder.WriteString("nameserver " + s.String() + "\n")
 	}
 
-	if b.Len() == 0 {
+	if builder.Len() == 0 {
 		return nil
 	}
 
-	if err := os.MkdirAll("/etc", 0o755); err != nil {
-		return err
+	if err := os.MkdirAll("/etc", dirMode); err != nil {
+		return fmt.Errorf(errFmtMkdir, "/etc", err)
 	}
 
-	return os.WriteFile("/etc/resolv.conf", []byte(b.String()), 0o644)
+	if err := os.WriteFile("/etc/resolv.conf", []byte(builder.String()), fileMode); err != nil {
+		return fmt.Errorf("write /etc/resolv.conf: %w", err)
+	}
+
+	return nil
 }
 
 // runBuild execs the build under bash with the env staged at /kernel/build.env,
@@ -341,9 +364,9 @@ func runBuild() (int, error) {
 	// Tee the build's output to a durable log on the /kernel share, on top of the live
 	// console. The console (hvc0) is best-effort — its tail can be lost on poweroff — so the
 	// fsync'd log is the authoritative record the host reads to debug a failed build.
-	logFile, err := os.OpenFile(buildLog, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	logFile, err := os.OpenFile(buildLog, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileMode)
 	if err != nil {
-		return initFailedStatus, fmt.Errorf("open %s: %w", buildLog, err)
+		return initFailedStatus, fmt.Errorf(errFmtOpen, buildLog, err)
 	}
 
 	defer func() {
@@ -356,6 +379,9 @@ func runBuild() (int, error) {
 	// Both guest fds already share the console, so routing stderr via os.Stdout loses nothing.
 	out := io.MultiWriter(os.Stdout, logFile)
 
+	// noctx: PID 1 has no cancellation story — the build runs to completion and the HOST
+	// cancels by stopping the VM. A context.Background() here would be pure ceremony.
+	//nolint:noctx
 	cmd := exec.Command("/bin/bash", buildScript)
 	cmd.Env = env
 	cmd.Dir = kernelShare
@@ -380,17 +406,17 @@ func readEnvFile(path string) ([]string, error) {
 	// PID 1's own environment carries no PATH, so the file-missing path needs this too.
 	env := []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 
-	f, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: path is the envFile constant, host-staged.
 	if err != nil {
 		if os.IsNotExist(err) {
 			return env, nil
 		}
 
-		return nil, fmt.Errorf("open %s: %w", path, err)
+		return nil, fmt.Errorf(errFmtOpen, path, err)
 	}
-	defer func() { _ = f.Close() }()
+	defer func() { _ = file.Close() }()
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -413,24 +439,24 @@ func readEnvFile(path string) ([]string, error) {
 // for the new directory entry. That replaces the old unix.Sync()+sleep with a hard
 // guarantee — when this returns, the host is certain to see the status.
 func writeStatus(code int) error {
-	f, err := os.OpenFile(statusPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	file, err := os.OpenFile(statusPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileMode)
 	if err != nil {
-		return fmt.Errorf("open %s: %w", statusPath, err)
+		return fmt.Errorf(errFmtOpen, statusPath, err)
 	}
 
-	if _, err := f.WriteString(strconv.Itoa(code) + "\n"); err != nil {
-		_ = f.Close()
+	if _, err := file.WriteString(strconv.Itoa(code) + "\n"); err != nil {
+		_ = file.Close()
 
 		return fmt.Errorf("write %s: %w", statusPath, err)
 	}
 
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
 
 		return fmt.Errorf("fsync %s: %w", statusPath, err)
 	}
 
-	if err := f.Close(); err != nil {
+	if err := file.Close(); err != nil {
 		return fmt.Errorf("close %s: %w", statusPath, err)
 	}
 

@@ -74,6 +74,7 @@ EOF
 }
 
 apt-get update -qq
+# shellcheck disable=SC2086  # intentional word-split of PACKAGES into one argument per package
 apt-get install -y -qq --no-install-recommends ${PACKAGES}
 
 # Compiler: the pinned LLVM release tarball (github.com/llvm/llvm-project/releases),
@@ -158,6 +159,7 @@ NO_CAPSTONE=1 NO_LIBPFM4=1 NO_LIBDEBUGINFOD=1"
   # steps carry LLVM=1 so kconfig sees CC_IS_CLANG/LD_IS_LLD and the ThinLTO choice is
   # selectable; merge_config.sh runs with only ARCH= (its -m mode just concatenates text and
   # never invokes kconfig — the real evaluation is olddefconfig, which has LLVM=1).
+  # shellcheck disable=SC2086  # intentional word-split of MAKEARGS
   make ${MAKEARGS} HOSTLDFLAGS="${HOST_LDFLAGS}" tinyconfig
 
   # THE RECURRING TRAP, made loud. kernel/configs/tiny.config is our BASE and it is five
@@ -181,6 +183,7 @@ NO_CAPSTONE=1 NO_LIBPFM4=1 NO_LIBDEBUGINFOD=1"
   [ "$unnamed" -eq 0 ] || { echo "tinyconfig base has unnamed defaults — see above" >&2; exit 1; }
   ARCH="${KARCH}" scripts/kconfig/merge_config.sh -m .config \
     /kernel/kernel-fragment
+  # shellcheck disable=SC2086  # intentional word-split of MAKEARGS
   make ${MAKEARGS} HOSTLDFLAGS="${HOST_LDFLAGS}" olddefconfig
 
   # Assert every fragment line survived olddefconfig — it can silently revert a symbol whose
@@ -205,6 +208,7 @@ NO_CAPSTONE=1 NO_LIBPFM4=1 NO_LIBDEBUGINFOD=1"
   [ "$drift" -eq 0 ] || { echo "config drift after olddefconfig — aborting before promote" >&2; exit 1; }
 
   # Plain lines (set -e aborts on any failure) — clearer in CI than a chained &&.
+  # shellcheck disable=SC2086  # intentional word-split of MAKEARGS
   make -s ${MAKEARGS} HOSTLDFLAGS="${HOST_LDFLAGS}" -j"$(nproc)" LOCALVERSION="${LOCALVERSION}"
   cp "${IMAGE_PATH}" "/kernel/${OUTPUT_NAME}"
 )
