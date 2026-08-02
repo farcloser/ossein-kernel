@@ -318,6 +318,24 @@ CONFIG_EXT4_FS_POSIX_ACL=y
 CONFIG_FUSE_FS=y
 CONFIG_VIRTIO_FS=y
 CONFIG_OVERLAY_FS=y
+# EROFS read-only rootfs lower for the mount-instead-of-extract
+# materialization (ossein docs/ROOTFS-MATERIALIZATION.md option 3: the
+# flattened image IS a mountable fs; the guest mounts it ro and overlays a
+# tmpfs upper — boot cost is two mounts, flat in image size).
+# MISC_FILESYSTEMS is only the menu gate EROFS sits behind, not code.
+# XATTR + SECURITY carry security.capability on image files; ACL matches the
+# TMPFS_POSIX_ACL stance above. ZIP (and its LZ4/XZ decompressor payload) is
+# deliberately OFF: ossein stores images uncompressed — decompression CPU
+# would compete with the workload at fault time, and disk is the cheapest
+# resource here. BACKED_BY_FILE (loop-style file-backed mounts) is unused.
+CONFIG_MISC_FILESYSTEMS=y
+CONFIG_EROFS_FS=y
+CONFIG_EROFS_FS_XATTR=y
+CONFIG_EROFS_FS_SECURITY=y
+CONFIG_EROFS_FS_POSIX_ACL=y
+# CONFIG_EROFS_FS_ZIP is not set
+# CONFIG_EROFS_FS_BACKED_BY_FILE is not set
+# CONFIG_EROFS_FS_DEBUG is not set
 CONFIG_TMPFS=y
 CONFIG_TMPFS_POSIX_ACL=y
 CONFIG_TMPFS_XATTR=y
