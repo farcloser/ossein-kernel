@@ -48,9 +48,9 @@ jobs:
         # windows legs run the recipes under git-bash (native arm64 tools
         # where upstream ships them, Prism-emulated amd64 via aqua's
         # windows_arm_emulation where it does not).
-        # These entries are also the default required-status-check contexts of
-        # the canonical limen:main ruleset (defaultRequiredChecks in
-        # internal/github/audit.go) — change the two together, in one release.
+        # These names are NOT the ruleset's required contexts — the `gate` job
+        # below is, precisely so this list can change without touching any
+        # repository's branch protection.
         os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025, windows-11-arm]
     runs-on: ${{ matrix.os }}
     # Generous for the windows legs: those runners are markedly slower, and the
@@ -82,3 +82,31 @@ jobs:
 
       - name: Test
         run: just test
+
+  # The ONE required status check (see defaultRequiredChecks in
+  # internal/github/audit.go). Branch protection names contexts as strings, so
+  # requiring the matrix legs directly would bake this workflow's runner list
+  # into every repository's ruleset — and a project whose matrix differs then
+  # waits forever on checks that never report. This job collapses the matrix,
+  # whatever its shape, to a single stable name: change the legs above freely,
+  # the ruleset never moves.
+  gate:
+    needs: [verify]
+    # always(), and the result asserted explicitly. Without always() a failed
+    # or cancelled dependency SKIPS this job instead of failing it, and a
+    # skipped required check does not block a merge — branch protection that
+    # quietly stops protecting. `needs.verify.result` is success only when
+    # every matrix leg succeeded.
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Every verify leg succeeded
+        env:
+          # Via env, never interpolated into the script: the shell sees data,
+          # not something the expression layer can rewrite into code.
+          RESULT: ${{ needs.verify.result }}
+        run: |
+          printf 'verify: %s\n' "$RESULT"
+          [ "$RESULT" = "success" ]
