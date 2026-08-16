@@ -46,28 +46,28 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.0.8/limen_0.0.8_darwin_arm64.tar.gz",
-      "checksum": "57AE1E9398565E4E2A0A8DB23D6C98E406655F9BBF19DBD0EBCB7F21BE49379E",
+      "id": "github_release/github.com/farcloser/limen/v0.0.16/limen_0.0.16_darwin_arm64.tar.gz",
+      "checksum": "529FB618F0E880DF5EFC4C208180EFBA7C9421460829193D7A6FA7DC78AAE70E",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.0.8/limen_0.0.8_linux_amd64.tar.gz",
-      "checksum": "397CEF56A8A22F6BC8BEBE492BC69587A19DDC2989CBE0F0D760356902359352",
+      "id": "github_release/github.com/farcloser/limen/v0.0.16/limen_0.0.16_linux_amd64.tar.gz",
+      "checksum": "9A2F747BF0EB89BAF1FDB578F2420BD3F18F92EDAD6BC1CE218EF4B45D255040",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.0.8/limen_0.0.8_linux_arm64.tar.gz",
-      "checksum": "70772E289B4F4DBA37F84E8AAE6B91C7AB09BB1EAF989B33569E0FA9886F5160",
+      "id": "github_release/github.com/farcloser/limen/v0.0.16/limen_0.0.16_linux_arm64.tar.gz",
+      "checksum": "09FA9D982731750B7C64B4024B28998007C90A72527880C16A0FFDFD53815570",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.0.8/limen_0.0.8_windows_amd64.tar.gz",
-      "checksum": "BCD8DF9BAF05EF8BD06AEEA91B80E7B74455D90DA51BDD189994DB26B56933AB",
+      "id": "github_release/github.com/farcloser/limen/v0.0.16/limen_0.0.16_windows_amd64.tar.gz",
+      "checksum": "BB54B101F957872AE24E5D99EB0C8F8117C09604669056F2F2C4A9A9AFC288E9",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.0.8/limen_0.0.8_windows_arm64.tar.gz",
-      "checksum": "438B1AB96EFC721446E227EA85A3B1E3A216DA52B523BF522EB6B46C6145B470",
+      "id": "github_release/github.com/farcloser/limen/v0.0.16/limen_0.0.16_windows_arm64.tar.gz",
+      "checksum": "B6047BBE537D439C75CDC2356F8A7CF4DFFDFF0BFB6CF019FBF0D1AC46E9B293",
       "algorithm": "sha256"
     },
     {

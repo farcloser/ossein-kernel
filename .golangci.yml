@@ -284,7 +284,7 @@ linters:
             - $gostd
             - github.com/farcloser/ossein-kernel
             - github.com/mycophonic/primordium
-            - github.com/mycophonic/xz
+            - github.com/forkcloser/xz
             - github.com/alecthomas/kong
             # standalone build environment (replaced ossein): VZ boot, rootfs packer, guest init
             - github.com/Code-Hex/vz/v3
