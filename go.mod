@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/Code-Hex/vz/v3 v3.7.1
 	github.com/alecthomas/kong v1.16.0
-	github.com/diskfs/go-diskfs v1.9.3
+	github.com/diskfs/go-diskfs v1.9.4
 	github.com/google/go-containerregistry v0.21.7
 	github.com/insomniacslk/dhcp v0.0.0-20260603135910-a415979eb11e
 	github.com/mycophonic/primordium v0.6.0
