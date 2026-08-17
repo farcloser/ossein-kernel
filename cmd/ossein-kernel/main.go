@@ -30,13 +30,13 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	uxz "github.com/forkcloser/xz"
 
 	"github.com/mycophonic/primordium/app/logger"
 	"github.com/mycophonic/primordium/compress"
 	"github.com/mycophonic/primordium/filesystem"
 	"github.com/mycophonic/primordium/filesystem/dirs"
 	"github.com/mycophonic/primordium/network/transporter"
-	uxz "github.com/mycophonic/xz"
 
 	"github.com/farcloser/ossein-kernel/internal/rootfs"
 	"github.com/farcloser/ossein-kernel/internal/vm"
@@ -727,7 +727,7 @@ func extractLLVM(tarball, destDir string) error {
 	defer func() { _ = tarFile.Close() }()
 
 	// One-time bypass of primordium's compress.Decompress front door — deliberate, documented.
-	// The LLVM tarball is ~470 xz blocks (11.8 GB uncompressed), and mycophonic/xz can decode
+	// The LLVM tarball is ~470 xz blocks (11.8 GB uncompressed), and forkcloser/xz can decode
 	// them concurrently via NewParallelReader — but that needs random access (io.ReaderAt) + the
 	// file size to read the block index, which compress.Decompress's io.Reader signature can't
 	// express. A raw *os.File gives us both. Measured on this host (18 workers): 6.7s vs 76.9s

@@ -15,9 +15,21 @@ export CGO_ENABLED := '1'
 # intentional (this builds a Linux kernel); ignore the self-module in the dep scan.
 export LINT_GO_LICENSES_FLAGS := '--ignore=github.com/farcloser/ossein-kernel'
 
+# guest_env is the cross-compile environment for the linux/arm64 PID-1 init, and
+# guest_pkgs the packages it covers. `do lint go` runs golangci once per GOOS, but the
+# CGO_ENABLED=1 above pins it to the NATIVE leg only (loading foreign-GOOS packages needs
+# that platform's C toolchain), so everything behind //go:build linux — the whole init —
+# is invisible to it. The explicit leg in `lint` below is that missing half: without it
+# PID 1 ships unanalyzed.
+guest_env := "CGO_ENABLED=0 GOOS=linux GOARCH=arm64"
+guest_pkgs := "./cmd/ossein-kernel/init/..."
+
 # The FIRST recipe defined here becomes `just`'s default.
-lint: do::lint::default
-fix: do::fix::default
+lint: do::lint::default do::lint::go::default
+    {{ guest_env }} golangci-lint run {{ guest_pkgs }}
+    {{ guest_env }} govulncheck {{ guest_pkgs }}
+
+fix: do::fix::default do::fix::go::default
 test:
     go test ./...
 
@@ -47,8 +59,8 @@ all: kernel kernel-debug kernel-nopatch
 # ---------------------------------------------------------------------------
 
 # Pinned guest kernel source (passed explicitly to ossein-kernel). Latest stable.
-kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.3.tar.xz"
-kernel_source_sha256 := "be41c068e88f5242a19bccdbffbe077b18c47b45f627e2325504b4fab79dd1dc"
+kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz"
+kernel_source_sha256 := "22a0196b3cbcdf34dc27b77561f4d040585fd3447edc9ab3531a1ac79e3041e7"
 
 # Kernel build container (throwaway build VM only; nothing guest-facing), PINNED for
 # reproducibility on FOUR axes, ALL passed down to build.sh: the base image by DIGEST,
