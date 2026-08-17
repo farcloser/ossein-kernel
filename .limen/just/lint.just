@@ -182,9 +182,13 @@ commits range="": (_banner "lint" "commits")
     # below verify signatures — this is convenience wiring, not enforcement.
     # See https://github.com/andyfeller/gh-ssh-allowed-signers for automation
     # to retrieve contributor keys.
+    # Best-effort: sandboxed agent sessions (e.g. Claude Code) write-protect
+    # .git/config as an escape-vector guard, and losing the display wiring must
+    # not fail the lint the rules below actually enforce.
     if [ -f .allowed_signers ]; then
         git config --unset-all gpg.ssh.allowedSignersFile 2>/dev/null || true
-        git config --add gpg.ssh.allowedSignersFile .allowed_signers
+        git config --add gpg.ssh.allowedSignersFile .allowed_signers 2>/dev/null ||
+            echo "note: .git/config not writable; signature display not armed" >&2
     fi
     range="{{ range }}"
     if [ -z "$range" ] && [ -n "${GITHUB_BASE_REF:-}" ]; then

@@ -14,5 +14,8 @@
   // The update-aqua-checksum workflow pushes a fix-up commit onto Renovate's
   // branches; without this, Renovate treats the branch as human-modified and
   // stops rebasing it.
-  gitIgnoredAuthors: ["41898282+github-actions[bot]@users.noreply.github.com"],
+  gitIgnoredAuthors: [
+    "300983632+limen-ci-farcloser[bot]@users.noreply.github.com",
+    "41898282+github-actions[bot]@users.noreply.github.com",
+  ],
 }
