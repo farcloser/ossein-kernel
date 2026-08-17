@@ -32,11 +32,11 @@ packages:
   - name: github.com/farcloser/godolint/cmd/godolint@v0.1.0
     registry: local
   # --- farcloser tools (local registry; standard once registered upstream) ---
-  - name: farcloser/limen@v0.0.5 # renovate: depName=farcloser/limen
+  - name: farcloser/limen@v0.0.16 # renovate: depName=farcloser/limen
     registry: local
   # --- toolchain + binary-release tools (standard registry, aqua-verified) ---
-  - name: golang/go@go1.26.5
-  - name: casey/just@1.55.1
+  - name: golang/go@go1.26.6
+  - name: casey/just@1.58.0
   - name: koalaman/shellcheck@v0.11.0
   - name: golangci/golangci-lint@v2.12.2
   - name: google/yamlfmt@v0.21.0
@@ -45,4 +45,4 @@ packages:
   - name: sigstore/cosign@v3.1.3
   - name: gotestyourself/gotestsum@v1.13.0
   - name: jqlang/jq@jq-1.8.2
-  - name: cli/cli@v2.96.0
+  - name: cli/cli@v2.97.0
