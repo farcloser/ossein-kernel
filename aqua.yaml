@@ -35,7 +35,7 @@ packages:
   - name: farcloser/limen@v0.0.16 # renovate: depName=farcloser/limen
     registry: local
   # --- toolchain + binary-release tools (standard registry, aqua-verified) ---
-  - name: golang/go@go1.26.6
+  - name: golang/go@go1.27.0
   - name: casey/just@1.58.0
   - name: koalaman/shellcheck@v0.11.0
   - name: golangci/golangci-lint@v2.12.2
