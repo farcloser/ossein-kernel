@@ -317,7 +317,8 @@ formatters:
       no-prefix-comments: true
       custom-order: true
     gofumpt:
-      extra-rules: true
+      extra:
+        group-params: true
     golines:
       max-len: 120
       tab-len: 4

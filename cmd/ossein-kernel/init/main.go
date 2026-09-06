@@ -389,8 +389,7 @@ func runBuild() (int, error) {
 	cmd.Stderr = out
 
 	if err := cmd.Run(); err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok {
 			return exit.ExitCode(), nil // build ran and failed; surface its code
 		}
 
