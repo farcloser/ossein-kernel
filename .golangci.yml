@@ -129,6 +129,7 @@ linters:
     # These are the linters that we know we do not want
     - errchkjson # forces handling of json err (eg: prevents _), which is too much
     - exhaustruct # does not serve much of a purpose
+    - exhaustruct_v5 # the v2.13 rewrite of exhaustruct: same verdict (an unknown name here fails golangci < 2.13, so the pin and this line move together)
     - ginkgolinter # no ginkgo
     - godox # not helpful unless we could downgrade it to warning / info
     - nestif # already provided ten different ways with revive cognitive complexity, etc
