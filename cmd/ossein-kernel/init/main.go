@@ -406,7 +406,7 @@ func readEnvFile(path string) ([]string, error) {
 	// PID 1's own environment carries no PATH, so the file-missing path needs this too.
 	env := []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 
-	file, err := os.Open(path) //nolint:gosec // G304: path is the envFile constant, host-staged.
+	file, err := os.Open(path) // #nosec G304 -- path is the envFile constant, host-staged.
 	if err != nil {
 		if os.IsNotExist(err) {
 			return env, nil
