@@ -25,7 +25,7 @@ guest_env := "CGO_ENABLED=0 GOOS=linux GOARCH=arm64"
 guest_pkgs := "./cmd/ossein-kernel/init/..."
 
 # The FIRST recipe defined here becomes `just`'s default.
-lint: do::lint::default do::lint::go::default
+lint: do::lint::default do::lint::go::default do::lint::go::deadcode
     {{ guest_env }} golangci-lint run {{ guest_pkgs }}
     {{ guest_env }} govulncheck {{ guest_pkgs }}
 
