@@ -263,8 +263,7 @@ func (m *VM) Wait(ctx context.Context) error {
 	for {
 		select {
 		case state := <-m.vm.StateChangedNotify():
-			//nolint:exhaustive // only the two terminal states matter; default keeps waiting
-			switch state {
+			switch state { //nolint:exhaustive // only the two terminal states matter; default keeps waiting
 			case vz.VirtualMachineStateStopped:
 				return nil
 			case vz.VirtualMachineStateError:

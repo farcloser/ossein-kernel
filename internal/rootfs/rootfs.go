@@ -23,6 +23,7 @@ import (
 	"github.com/diskfs/go-diskfs/backend/file"
 	"github.com/diskfs/go-diskfs/filesystem/ext4"
 	"github.com/google/go-containerregistry/pkg/crane"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 )
@@ -42,7 +43,15 @@ const (
 // Build pulls imageRef (a digest-pinned OCI reference), unpacks it into a new ext4
 // image at outExt4 of the given nominal size (sparse), and embeds initBin as
 // /ossein-init. The image is arm64/linux.
+//
+// The digest pin is ENFORCED, not assumed: a bare tag would make the build
+// rootfs whatever the registry serves today, and the whole point of this
+// pipeline is that every input is content-addressed.
 func Build(ctx context.Context, imageRef, initBin, outExt4 string, sizeBytes int64) error {
+	if _, err := name.NewDigest(imageRef); err != nil {
+		return fmt.Errorf("image ref %q must be digest-pinned (repo@sha256:…): %w", imageRef, err)
+	}
+
 	img, err := crane.Pull(imageRef,
 		crane.WithContext(ctx),
 		crane.WithPlatform(&v1.Platform{OS: "linux", Architecture: "arm64"}),
@@ -117,12 +126,12 @@ func unpackTar(efs *ext4.FileSystem, src io.Reader) error {
 			return fmt.Errorf("read rootfs tar: %w", err)
 		}
 
-		name := diskPath(hdr.Name)
-		if name == "" || name == "." {
+		dest := diskPath(hdr.Name)
+		if dest == "" || dest == "." {
 			continue
 		}
 
-		if err := writeEntry(efs, name, hdr, tarReader); err != nil {
+		if err := writeEntry(efs, dest, hdr, tarReader); err != nil {
 			return err
 		}
 	}
@@ -130,39 +139,39 @@ func unpackTar(efs *ext4.FileSystem, src io.Reader) error {
 	return nil
 }
 
-func writeEntry(efs *ext4.FileSystem, name string, hdr *tar.Header, tarReader io.Reader) error {
+func writeEntry(efs *ext4.FileSystem, dest string, hdr *tar.Header, tarReader io.Reader) error {
 	switch hdr.Typeflag {
 	case tar.TypeDir:
-		if err := efs.Mkdir(name); err != nil {
-			return fmt.Errorf("mkdir %s: %w", name, err)
+		if err := efs.Mkdir(dest); err != nil {
+			return fmt.Errorf("mkdir %s: %w", dest, err)
 		}
 
-		return applyMeta(efs, name, hdr)
+		return applyMeta(efs, dest, hdr)
 
 	case tar.TypeReg:
-		if err := mkParent(efs, name); err != nil {
+		if err := mkParent(efs, dest); err != nil {
 			return err
 		}
 
-		if err := writeReg(efs, name, tarReader); err != nil {
+		if err := writeReg(efs, dest, tarReader); err != nil {
 			return err
 		}
 
-		return applyMeta(efs, name, hdr)
+		return applyMeta(efs, dest, hdr)
 
 	case tar.TypeSymlink:
-		if err := mkParent(efs, name); err != nil {
+		if err := mkParent(efs, dest); err != nil {
 			return err
 		}
 
-		if err := efs.Symlink(hdr.Linkname, name); err != nil {
-			return fmt.Errorf("symlink %s -> %s: %w", name, hdr.Linkname, err)
+		if err := efs.Symlink(hdr.Linkname, dest); err != nil {
+			return fmt.Errorf("symlink %s -> %s: %w", dest, hdr.Linkname, err)
 		}
 
 		return nil // ext4 symlink perms are fixed; no chmod needed
 
 	case tar.TypeLink:
-		if err := mkParent(efs, name); err != nil {
+		if err := mkParent(efs, dest); err != nil {
 			return err
 		}
 
@@ -172,8 +181,8 @@ func writeEntry(efs *ext4.FileSystem, name string, hdr *tar.Header, tarReader io
 		// target need not already be extracted. Debian uses these for multi-call and
 		// versioned binaries (e.g. perl5.40.1 -> perl).
 		target := slash + diskPath(hdr.Linkname)
-		if err := efs.Symlink(target, name); err != nil {
-			return fmt.Errorf("hardlink-as-symlink %s -> %s: %w", name, target, err)
+		if err := efs.Symlink(target, dest); err != nil {
+			return fmt.Errorf("hardlink-as-symlink %s -> %s: %w", dest, target, err)
 		}
 
 		return nil
@@ -184,20 +193,20 @@ func writeEntry(efs *ext4.FileSystem, name string, hdr *tar.Header, tarReader io
 	}
 }
 
-func writeReg(efs *ext4.FileSystem, name string, src io.Reader) error {
-	out, err := efs.OpenFile(name, os.O_CREATE|os.O_RDWR|os.O_TRUNC)
+func writeReg(efs *ext4.FileSystem, dest string, src io.Reader) error {
+	out, err := efs.OpenFile(dest, os.O_CREATE|os.O_RDWR|os.O_TRUNC)
 	if err != nil {
-		return fmt.Errorf("create %s: %w", name, err)
+		return fmt.Errorf("create %s: %w", dest, err)
 	}
 
 	if _, err := io.Copy(out, src); err != nil {
 		_ = out.Close()
 
-		return fmt.Errorf("write %s: %w", name, err)
+		return fmt.Errorf("write %s: %w", dest, err)
 	}
 
 	if err := out.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", name, err)
+		return fmt.Errorf("close %s: %w", dest, err)
 	}
 
 	return nil
@@ -205,14 +214,14 @@ func writeReg(efs *ext4.FileSystem, name string, src io.Reader) error {
 
 // applyMeta sets ownership and mode from the tar header. Debian's base is almost
 // entirely root:root, but honour whatever the archive says.
-func applyMeta(efs *ext4.FileSystem, name string, hdr *tar.Header) error {
-	//nolint:gosec // G115: a tar file mode always fits FileMode's low bits
-	if err := efs.Chmod(name, os.FileMode(hdr.Mode).Perm()); err != nil {
-		return fmt.Errorf("chmod %s: %w", name, err)
+func applyMeta(efs *ext4.FileSystem, dest string, hdr *tar.Header) error {
+	// #nosec G115 -- a tar file mode always fits FileMode's low bits
+	if err := efs.Chmod(dest, os.FileMode(hdr.Mode).Perm()); err != nil {
+		return fmt.Errorf("chmod %s: %w", dest, err)
 	}
 
-	if err := efs.Chown(name, hdr.Uid, hdr.Gid); err != nil {
-		return fmt.Errorf("chown %s: %w", name, err)
+	if err := efs.Chown(dest, hdr.Uid, hdr.Gid); err != nil {
+		return fmt.Errorf("chown %s: %w", dest, err)
 	}
 
 	return nil
@@ -220,8 +229,8 @@ func applyMeta(efs *ext4.FileSystem, name string, hdr *tar.Header) error {
 
 // mkParent ensures the parent directory chain exists (tar streams are usually
 // ordered parents-first, but not guaranteed to emit every intermediate dir).
-func mkParent(efs *ext4.FileSystem, name string) error {
-	dir := path.Dir(name)
+func mkParent(efs *ext4.FileSystem, dest string) error {
+	dir := path.Dir(dest)
 	if dir == "." || dir == "/" || dir == "" {
 		return nil
 	}
@@ -234,18 +243,18 @@ func mkParent(efs *ext4.FileSystem, name string) error {
 }
 
 func embedInit(efs *ext4.FileSystem, initBin string) error {
-	src, err := os.Open(initBin) //nolint:gosec // G304: initBin is a program-supplied path
+	src, err := os.Open(initBin) // #nosec G304 -- initBin is a program-supplied path
 	if err != nil {
 		return fmt.Errorf("open init binary %s: %w", initBin, err)
 	}
 	defer func() { _ = src.Close() }()
 
-	name := diskPath(initGuestPath)
-	if err := writeReg(efs, name, src); err != nil {
+	dest := diskPath(initGuestPath)
+	if err := writeReg(efs, dest, src); err != nil {
 		return err
 	}
 
-	if err := efs.Chmod(name, initMode); err != nil {
+	if err := efs.Chmod(dest, initMode); err != nil {
 		return fmt.Errorf("chmod init: %w", err)
 	}
 
@@ -253,11 +262,15 @@ func embedInit(efs *ext4.FileSystem, initBin string) error {
 }
 
 // diskPath converts a tar/absolute path to the relative, leading-slash-free form
-// go-diskfs requires (its validatePath rejects a leading '/').
-func diskPath(p string) string {
-	p = strings.TrimPrefix(p, "."+slash)
-	p = strings.TrimPrefix(p, slash)
-	p = strings.TrimSuffix(p, slash)
+// go-diskfs requires (its validatePath rejects a leading '/'). Clean first, then
+// strip: cleaning collapses "./x", "a//b" and trailing slashes, and only the
+// slashes still leading after that are stripped — FuzzDiskPath found that
+// stripping one slash before cleaning let "///x" through as "/x".
+func diskPath(raw string) string {
+	cleaned := strings.TrimLeft(path.Clean(raw), slash)
+	if cleaned == "" {
+		return "."
+	}
 
-	return path.Clean(p)
+	return cleaned
 }

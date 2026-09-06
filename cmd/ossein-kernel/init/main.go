@@ -389,8 +389,7 @@ func runBuild() (int, error) {
 	cmd.Stderr = out
 
 	if err := cmd.Run(); err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok {
 			return exit.ExitCode(), nil // build ran and failed; surface its code
 		}
 
@@ -406,7 +405,7 @@ func readEnvFile(path string) ([]string, error) {
 	// PID 1's own environment carries no PATH, so the file-missing path needs this too.
 	env := []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 
-	file, err := os.Open(path) //nolint:gosec // G304: path is the envFile constant, host-staged.
+	file, err := os.Open(path) // #nosec G304 -- path is the envFile constant, host-staged.
 	if err != nil {
 		if os.IsNotExist(err) {
 			return env, nil
