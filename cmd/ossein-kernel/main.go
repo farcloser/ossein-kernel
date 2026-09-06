@@ -427,7 +427,7 @@ func boot(ctx context.Context, machine *vm.VM, sharedDir string) (int, error) {
 }
 
 func readStatus(statusPath string) (int, error) {
-	data, err := os.ReadFile(statusPath) //nolint:gosec // G304: statusPath is a fixed scratchDir path
+	data, err := os.ReadFile(statusPath) // #nosec G304 -- statusPath is a fixed scratchDir path
 	if err != nil {
 		return 0, fmt.Errorf("%w at %s: %w", errNoStatus, statusPath, err)
 	}
@@ -457,7 +457,7 @@ func prepareRootfs(ctx context.Context, cfg config) (string, error) {
 		return "", err
 	}
 
-	//nolint:gosec // G304: stamp is a fixed scratchDir path
+	// #nosec G304 -- stamp is a fixed scratchDir path
 	if prev, err := os.ReadFile(stamp); err == nil && strings.TrimSpace(string(prev)) == key {
 		if fi, err := os.Stat(rootImage); err == nil && fi.Size() > 0 {
 			slog.Info("reusing Debian root disk", "path", rootImage, "image", cfg.Image)
@@ -624,7 +624,7 @@ func downloadAttempt(ctx context.Context, client *http.Client, url, tmp, label s
 		return 0, fmt.Errorf("%w: %s HTTP %s", errDownloadHTTP, label, resp.Status)
 	}
 
-	outFile, err := os.Create(tmp) //nolint:gosec // G304: tmp is a program-built path
+	outFile, err := os.Create(tmp) // #nosec G304 -- tmp is a program-built path
 	if err != nil {
 		return 0, fmt.Errorf("create temp file %s: %w", tmp, err)
 	}
@@ -686,7 +686,7 @@ func prepareLLVM(ctx context.Context, client *http.Client, cfg config) (string, 
 
 	stamp := filepath.Join(llvmDir, ".ossein-llvm-sha")
 
-	stampSHA, err := os.ReadFile(stamp) //nolint:gosec // G304: stamp is a fixed scratchDir path
+	stampSHA, err := os.ReadFile(stamp) // #nosec G304 -- stamp is a fixed scratchDir path
 	if err == nil && strings.TrimSpace(string(stampSHA)) == cfg.LLVMSHA {
 		slog.Info("reusing extracted LLVM toolchain", "path", llvmDir)
 
@@ -720,7 +720,7 @@ func prepareLLVM(ctx context.Context, client *http.Client, cfg config) (string, 
 }
 
 func extractLLVM(tarball, destDir string) error {
-	tarFile, err := os.Open(tarball) //nolint:gosec // G304: tarball is a fixed scratchDir path
+	tarFile, err := os.Open(tarball) // #nosec G304 -- tarball is a fixed scratchDir path
 	if err != nil {
 		return fmt.Errorf("open llvm tarball %s: %w", tarball, err)
 	}
@@ -800,9 +800,9 @@ func writeLLVMEntry(root, target string, hdr *tar.Header, tarReader *tar.Reader)
 			return fmt.Errorf("mkdir parent of %s: %w", target, err)
 		}
 		// Preserve the archive's mode bits (.Perm()) — clang/ld.lld need their exec bit.
-		mode := os.FileMode(hdr.Mode).Perm() //nolint:gosec // G115: a tar file mode always fits uint32
+		mode := os.FileMode(hdr.Mode).Perm() // #nosec G115 -- a tar file mode always fits uint32
 
-		out, err := os.OpenFile(target, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode) //nolint:gosec // G304: path validated
+		out, err := os.OpenFile(target, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode) // #nosec G304 -- path validated
 		if err != nil {
 			return fmt.Errorf("create %s: %w", target, err)
 		}
@@ -824,7 +824,7 @@ func writeLLVMEntry(root, target string, hdr *tar.Header, tarReader *tar.Reader)
 		// to create one. Resolve the target relative to the link's own directory before checking.
 		linkTarget := hdr.Linkname
 		if !filepath.IsAbs(linkTarget) {
-			//nolint:gosec // G305: joined only to validate the target; escapes are rejected below
+			// #nosec G305 -- joined only to validate the target; escapes are rejected below
 			linkTarget = filepath.Join(filepath.Dir(target), linkTarget)
 		}
 
@@ -903,7 +903,7 @@ func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA stri
 		return "", err
 	}
 
-	tarFile, err := os.Open(tarball) //nolint:gosec // G304: tarball is a fixed scratchDir path
+	tarFile, err := os.Open(tarball) // #nosec G304 -- tarball is a fixed scratchDir path
 	if err != nil {
 		return "", fmt.Errorf("open seed tarball %s: %w", tarball, err)
 	}
@@ -938,12 +938,12 @@ func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA stri
 			// forever, wedging every future cold start at VM boot.
 			partial := cache + partialSuffix
 
-			out, err := os.Create(partial) //nolint:gosec // G304: partial is a fixed scratchDir path
+			out, err := os.Create(partial) // #nosec G304 -- partial is a fixed scratchDir path
 			if err != nil {
 				return "", fmt.Errorf("create seed file %s: %w", partial, err)
 			}
 
-			if _, err := io.Copy(out, tarReader); err != nil { //nolint:gosec // sha-verified pinned release
+			if _, err := io.Copy(out, tarReader); err != nil { // #nosec G110 -- sha-verified pinned release
 				_ = out.Close()
 
 				return "", fmt.Errorf("write seed kernel: %w", err)
@@ -1024,7 +1024,7 @@ func copyWithProgress(dst io.Writer, src io.Reader, total int64, label string) (
 }
 
 func verifySHA(file, want string) error {
-	handle, err := os.Open(file) //nolint:gosec // G304: file is a program-built artifact path
+	handle, err := os.Open(file) // #nosec G304 -- file is a program-built artifact path
 	if err != nil {
 		return fmt.Errorf("open %s: %w", file, err)
 	}
@@ -1044,7 +1044,7 @@ func verifySHA(file, want string) error {
 }
 
 func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src) //nolint:gosec // G304: src is a program-built path (config/patch/artifact)
+	data, err := os.ReadFile(src) // #nosec G304 -- src is a program-built path (config/patch/artifact)
 	if err != nil {
 		return fmt.Errorf("read %s: %w", src, err)
 	}

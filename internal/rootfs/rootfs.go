@@ -206,7 +206,7 @@ func writeReg(efs *ext4.FileSystem, name string, src io.Reader) error {
 // applyMeta sets ownership and mode from the tar header. Debian's base is almost
 // entirely root:root, but honour whatever the archive says.
 func applyMeta(efs *ext4.FileSystem, name string, hdr *tar.Header) error {
-	//nolint:gosec // G115: a tar file mode always fits FileMode's low bits
+	// #nosec G115 -- a tar file mode always fits FileMode's low bits
 	if err := efs.Chmod(name, os.FileMode(hdr.Mode).Perm()); err != nil {
 		return fmt.Errorf("chmod %s: %w", name, err)
 	}
@@ -234,7 +234,7 @@ func mkParent(efs *ext4.FileSystem, name string) error {
 }
 
 func embedInit(efs *ext4.FileSystem, initBin string) error {
-	src, err := os.Open(initBin) //nolint:gosec // G304: initBin is a program-supplied path
+	src, err := os.Open(initBin) // #nosec G304 -- initBin is a program-supplied path
 	if err != nil {
 		return fmt.Errorf("open init binary %s: %w", initBin, err)
 	}
