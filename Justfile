@@ -280,7 +280,7 @@ release-kernel tag:
     rm -rf "$rel"; mkdir -p "$rel"
     cp build/kernel-arm64 build/perf-arm64 "$rel/"
     ( cd "$rel"
-      shasum -a 256 kernel-arm64 perf-arm64 > SHA256SUMS
+      sha256sum kernel-arm64 perf-arm64 > SHA256SUMS
       cosign sign-blob --yes --bundle SHA256SUMS.cosign.bundle SHA256SUMS
     )
 
