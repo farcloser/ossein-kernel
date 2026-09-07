@@ -190,10 +190,12 @@ kernel-golden kernel="build/kernel-arm64":
 # not fit — this signs and publishes an already boot-verified blob.
 # ---------------------------------------------------------------------------
 
-# The maintainer's keyless-signing identity (sigstore/Fulcio SAN) and OIDC issuer. Consumers
-# verify a released kernel against these EXACT values — a build signed by any other identity or
-# issuer is not ours. Read from the signing cert; update both if the signer/provider changes.
-maintainer_identity := "apostasie@farcloser.world"
+# Who signed a release: a REGEXP over the certificate SAN, anchored on the GitHub user id
+# (mirrors ossein's guest_kernel_identity). With keyless signing the email claim is mutable
+# account state — the email-privacy toggle flips it between apostasie@farcloser.world and
+# 142371135+…@users.noreply.github.com (7.1.5-ossein.2 carries the latter); the numeric id
+# is not. Consumers verify against this and the issuer; update both if the signer changes.
+maintainer_identity_regexp := '^(142371135\+[^@]+@users\.noreply\.github\.com|apostasie@farcloser\.world)$'
 maintainer_oidc_issuer := "https://github.com/login/oauth"
 
 # Cut a kernel release: (re)build + boot-verify, then publish build/kernel-arm64 + perf-arm64
@@ -203,8 +205,9 @@ maintainer_oidc_issuer := "https://github.com/login/oauth"
 # (e.g. 7.1.3-ossein.1) — the version MUST match the pinned kernel source; bump <rev> for a
 # rebuild of the same upstream (config/patch/toolchain change), reset to 1 on a source bump.
 # NO leading "v": a v-prefixed hyphen-suffixed tag parses as a SemVer PRE-release (sorts BEFORE
-# X.Y.Z), which loses GitHub's "Latest" and misleads Renovate/sort -V. Signing opens a browser
-# for the OIDC flow.
+# X.Y.Z), which loses GitHub's "Latest" and misleads Renovate/sort -V. The git tag is signed
+# (your key signs the intent, as in the shared release lane); cosign opens a browser for the
+# OIDC flow.
 # just release-kernel 7.1.3-ossein.1
 release-kernel tag:
     #!/usr/bin/env bash
@@ -258,7 +261,7 @@ release-kernel tag:
         echo "## Verify"
         echo '```'
         echo "cosign verify-blob --bundle SHA256SUMS.cosign.bundle \\"
-        echo "  --certificate-identity {{ maintainer_identity }} \\"
+        echo "  --certificate-identity-regexp '{{ maintainer_identity_regexp }}' \\"
         echo "  --certificate-oidc-issuer {{ maintainer_oidc_issuer }} SHA256SUMS"
         echo "shasum -a 256 -c SHA256SUMS"
         echo '```'
@@ -285,7 +288,7 @@ release-kernel tag:
     } > "$rel/NOTES.md"
 
     # --- tag, push, publish (only now, after everything above succeeded) ---
-    git tag -a "$tag" -m "$tag"
+    git tag -s "$tag" -m "$tag"
     git push origin HEAD
     git push origin "refs/tags/$tag"
     gh release create "$tag" --verify-tag --title "$tag" --notes-file "$rel/NOTES.md" \
