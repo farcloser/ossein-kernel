@@ -27,7 +27,10 @@ guest_pkgs := "./cmd/ossein-kernel/init/..."
 # The FIRST recipe defined here becomes `just`'s default.
 lint: do::lint::default do::lint::go::default do::lint::go::deadcode
     {{ guest_env }} golangci-lint run {{ guest_pkgs }}
-    {{ guest_env }} govulncheck {{ guest_pkgs }}
+    # govulncheck is a go.mod tool now (limen ≥ 0.1.0); the shared vuln recipe
+    # this depends on has already built it natively into build/tools/, and that
+    # binary runs under the guest GOOS like the shared per-GOOS legs do.
+    {{ guest_env }} build/tools/govulncheck {{ guest_pkgs }}
 
 fix: do::fix::default do::fix::go::default
 test:

@@ -11,18 +11,13 @@ packages:
   # `name:` is spelled out as the import path every time — the name aqua.yaml
   # pins under.
   #
-  # The /v2 module-path suffix is mandatory (Go semantic import versioning):
-  # `go install github.com/google/go-licenses@v2.x` is rejected by the
-  # toolchain. Go strips the /v2 when naming the binary; files spells it out.
-  - type: go_install
-    name: github.com/google/go-licenses/v2
-    path: github.com/google/go-licenses/v2
-    repo_owner: google
-    repo_name: go-licenses
-    description: Report on the licenses of a Go project's dependencies
-    version_source: github_tag
-    files:
-      - name: go-licenses
+  # Only tools that never load Go source belong here. The Go-source analyzers
+  # (deadcode, govulncheck, go-licenses) are go.mod `tool` directives instead
+  # (see book/tooling.md, "Go-source analyzers are go.mod tools"): aqua builds
+  # a go_install package once per tool version, with whichever project's
+  # pinned go ran it first, then shares that binary — an analyzer built by
+  # go1.N cannot read a module declaring go1.N+1. Listing one of them here
+  # again would reopen exactly that hole; limen retires them (the aqua rule).
   - type: go_install
     name: github.com/vbatts/git-validation
     path: github.com/vbatts/git-validation
@@ -49,28 +44,6 @@ packages:
     version_source: github_tag
     version_prefix: cmd/dot/
     version_filter: Version startsWith "cmd/dot/"
-  # The Go team distributes govulncheck via `go install` only, by policy. The
-  # repo is not inferable from the golang.org import path, hence the explicit
-  # owner/name (same as the standard registry does for gopls).
-  - type: go_install
-    name: golang.org/x/vuln/cmd/govulncheck
-    path: golang.org/x/vuln/cmd/govulncheck
-    repo_owner: golang
-    repo_name: vuln
-    description: Scan dependencies against the Go vulnerability database
-    version_source: github_tag
-  # Same golang.org path situation as govulncheck: explicit name and repo.
-  # golang/tools also tags gopls releases (gopls/vX.Y.Z) in the same repo;
-  # those are not x/tools versions and are filtered out, as the standard
-  # registry does for its own x/tools commands.
-  - type: go_install
-    name: golang.org/x/tools/cmd/deadcode
-    path: golang.org/x/tools/cmd/deadcode
-    repo_owner: golang
-    repo_name: tools
-    description: Whole-program detection of unreachable functions
-    version_source: github_tag
-    version_filter: not (Version startsWith "gopls/")
   # hadolint as pure Go, from the farcloser stable. The binary is the nested
   # cmd/godolint package of the root module — explicit name and repo, same
   # shape as go-graphviz's cmd/dot above (tags live at the repo root).

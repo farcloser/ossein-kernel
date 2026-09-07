@@ -18,13 +18,7 @@ registries:
 
 packages:
   # --- go install tools (local registry, GOSUMDB-verified) ---
-  - name: github.com/google/go-licenses/v2@v2.0.1
-    registry: local
   - name: github.com/vbatts/git-validation@v1.2.2
-    registry: local
-  - name: golang.org/x/vuln/cmd/govulncheck@v1.5.0
-    registry: local
-  - name: golang.org/x/tools/cmd/deadcode@v0.47.0
     registry: local
   # Pseudo-version: the nested cmd/dot module carries no tags upstream.
   - name: github.com/goccy/go-graphviz/cmd/dot@v0.0.0-20251129032125-76e04975df88
@@ -32,7 +26,7 @@ packages:
   - name: github.com/farcloser/godolint/cmd/godolint@v0.1.0
     registry: local
   # --- farcloser tools (local registry; standard once registered upstream) ---
-  - name: farcloser/limen@v0.0.16 # renovate: depName=farcloser/limen
+  - name: farcloser/limen@v0.1.0 # renovate: depName=farcloser/limen
     registry: local
   # --- toolchain + binary-release tools (standard registry, aqua-verified) ---
   - name: golang/go@go1.27.1
