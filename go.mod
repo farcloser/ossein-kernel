@@ -7,7 +7,7 @@ require (
 	github.com/alecthomas/kong v1.16.1
 	github.com/diskfs/go-diskfs v1.9.4
 	github.com/forkcloser/xz v0.0.0-20260816062216-a6404f43fdba
-	github.com/google/go-containerregistry v0.21.9
+	github.com/google/go-containerregistry v0.22.1
 	github.com/insomniacslk/dhcp v0.0.0-20260728151720-c308df0fdcef
 	github.com/mycophonic/primordium v0.8.0
 	github.com/vishvananda/netlink v1.3.1
