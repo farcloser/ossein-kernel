@@ -13,6 +13,11 @@ import 'lib.just'
 # --- Project tooling via aqua (see book/tooling.md). Each recipe takes the
 #     owner/repo exactly as it appears in aqua.yaml, e.g. golangci/golangci-lint. ---
 #
+# Not every tool is aqua's: the Go-source analyzers (deadcode, govulncheck,
+# go-licenses) are go.mod `tool` directives, built by the pinned go — add or
+# bump one with `go get -tool <pkg>@<version> && go mod tidy` (Renovate bumps
+# them too). See book/tooling.md, "Go-source analyzers are go.mod tools".
+#
 # The mutating recipes end with a FULL `aqua install`, never `--only-link`:
 # links verify nothing (lazy pulls are a CI economy — wrong at the moment a
 # pin changes), and for checksum-less package types (go_install) the

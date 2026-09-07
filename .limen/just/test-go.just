@@ -102,10 +102,17 @@ bench: (_banner "test go" "bench")
 # most. So: exit 1 WITH a new testdata file is a failure; exit 1 without one
 # is retried once, and a second in a row is treated as real. The generated
 # corpus lives under $(go env GOCACHE)/fuzz — cache that between CI runs and
-# fuzzing becomes cumulative. A tree with no fuzz targets says so and passes.
+# fuzzing becomes cumulative. A tree with no fuzz targets says so and passes,
+# and so does a tree with no Go module at all: the canonical CI workflow runs
+# this job in every repository, shell and Ruby ones included, and `go list`
+# outside a module is an error, not an empty list.
 fuzz: (_banner "test go" "fuzz")
     #!/usr/bin/env bash
     set -euo pipefail
+    if [ ! -f go.mod ]; then
+        echo "no go.mod — not a Go module, nothing to fuzz (skipped, not failed)."
+        exit 0
+    fi
     export CGO_ENABLED="{{ go_cgo }}"
     fuzztime="${TEST_GO_FUZZ_TIME:-10s}"
     # Crasher count for a target: the directory does not exist until the first

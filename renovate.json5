@@ -1,30 +1,18 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: [
-    "config:recommended",
-    // Default preset: detects owner/repo@ver and go-module packages in aqua.yaml,
-    // updates the standard-registry ref, and bumps aqua_version in CI/devcontainer too.
-    "github>aquaproj/aqua-renovate-config#2.13.0",
-  ],
-  // Supply-chain cooldown: wait before proposing a bump. Doubles as protection
-  // against the race where a release tag exists but its assets aren't uploaded yet.
-  minimumReleaseAge: "3 days",
-  // Vulnerability-fix PRs from GitHub's Dependabot alerts (the baseline keeps
-  // the alerts on for exactly this; Dependabot's OWN update PRs are off —
-  // Renovate is the one dependency bot). Stated explicitly, not left to the
-  // preset default, because `enabled: true` here is what reaches `// indirect`
-  // Go modules: the gomod manager disables indirect deps, and the alert path
-  // re-enables a dep only when this object says enabled. Fix PRs skip the
-  // cooldown above (a known-vulnerable version is the worse risk) and take
-  // the lowest fixed version, both Renovate defaults for this object.
-  vulnerabilityAlerts: {
-    enabled: true,
-  },
-  // `just do lint commits` enforces DCO on every PR range, bot commits included.
-  commitBody: "Signed-off-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>",
+  // The canonical Renovate configuration is a shared preset — `default.json`
+  // in the limen repository — so every repository inherits it by reference
+  // and a fix there reaches all of them without a file being re-seeded. The
+  // ref is pinned: the `renovate` rule keeps it at the repository's own limen
+  // version (the farcloser/limen pin in aqua.yaml), so the preset moves with
+  // the release like every other canonical file. limen itself, the preset's
+  // author, reads it from its own default branch. Everything below is the
+  // project's own — overrides and additions go here, next to the ref.
+  extends: ["github>farcloser/limen#v0.1.0"],
   // The update-aqua-checksum workflow pushes a fix-up commit onto Renovate's
   // branches; without this, Renovate treats the branch as human-modified and
-  // stops rebasing it.
+  // stops rebasing it. The org's App identity is the org's, so the array
+  // stays here (the `renovate` rule maintains it) rather than in the preset.
   gitIgnoredAuthors: [
     "300983632+limen-ci-farcloser[bot]@users.noreply.github.com",
     "41898282+github-actions[bot]@users.noreply.github.com",
