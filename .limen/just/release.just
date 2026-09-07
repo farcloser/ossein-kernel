@@ -36,17 +36,22 @@
 #
 # Tag pushes are always exactly one tag, never --tags: stray local tags stay
 # local. A tag already on HEAD is reused, so a failed publish retries safely.
-[doc('Release: `vX.Y.Z` tags for CI · `--local <cosign-key> vX.Y.Z` · `--local --dry-run` · `--ci`')]
+[doc('Release: `vX.Y.Z` signed tag (+ CI artifacts when .goreleaser.yaml exists) · `--local <cosign-key> vX.Y.Z` · `--local --dry-run` · `--ci`')]
 release *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    # Releasing is opt-in, by carrying a goreleaser config (project-owned, like
-    # the root Justfile — limen neither pins nor seeds it). Checked before
-    # anything else: past this point the recipe creates tags and pushes.
-    if [ ! -f .goreleaser.yaml ] && [ ! -f .goreleaser.yml ]; then
-        echo "this project has no .goreleaser.yaml — goreleaser releases are opt-in (see book/recipes.md)." >&2
-        exit 1
-    fi
+    # Artifacts are opt-in, by carrying a goreleaser config (project-owned, like
+    # the root Justfile — limen neither pins nor seeds it). Without one, the
+    # default lane still releases: the signed tag IS the release — a Go module,
+    # a tap, a configuration — and there is nothing to build or publish. The
+    # --local and --ci lanes exist only to run goreleaser, so they require it.
+    has_goreleaser() { [ -f .goreleaser.yaml ] || [ -f .goreleaser.yml ]; }
+    require_goreleaser() {
+        if ! has_goreleaser; then
+            echo "this project has no .goreleaser.yaml — this lane runs goreleaser (see book/recipes.md); a tag-only release is 'just do release vX.Y.Z'." >&2
+            exit 1
+        fi
+    }
     usage() {
         echo "usage: just do release <tag>                                               # signed tag + push; CI builds, signs (keyless), publishes" >&2
         echo "       just do release --local <cosign-key> <tag> [--cosign-password-stdin] # fully local, key-based cosign" >&2
@@ -109,6 +114,7 @@ release *args:
     case "${1:-}" in
         --local)
             shift
+            require_goreleaser
             if [ "${1:-}" = "--dry-run" ]; then
                 # Snapshot builds skip signing: no key material needed.
                 exec goreleaser release --snapshot --clean --skip=sign
@@ -208,6 +214,7 @@ release *args:
             # and CI checks out exactly that commit), publishing uses the
             # workflow's GITHUB_TOKEN, and signing is keyless — the OIDC
             # identity replaces any key.
+            require_goreleaser
             if [ -z "${GITHUB_ACTIONS:-}" ]; then
                 echo "--ci is the workflow half — locally, 'just do release <tag>' cuts the tag CI releases." >&2
                 exit 1
@@ -255,6 +262,10 @@ release *args:
             require_version_tag "$tag"
             require_clean
             tag_and_push "$tag"
-            echo "tag $tag pushed — the release workflow builds, signs, and publishes from here."
+            if has_goreleaser; then
+                echo "tag $tag pushed — the release workflow builds, signs, and publishes from here."
+            else
+                echo "tag $tag pushed — no .goreleaser.yaml, so the signed tag is the release: nothing to build or publish."
+            fi
             ;;
     esac
