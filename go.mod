@@ -9,14 +9,14 @@ require (
 	github.com/forkcloser/xz v0.0.0-20260907063006-1c9272beda0e
 	github.com/google/go-containerregistry v0.22.1
 	github.com/insomniacslk/dhcp v0.0.0-20260901064844-234b97448fae
-	github.com/mycophonic/primordium v0.8.0
+	github.com/mycophonic/primordium v0.9.0
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/sys v0.47.0
 )
 
 require (
 	github.com/Code-Hex/go-infinity-channel v1.0.0 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/cli v29.7.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.8 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -34,7 +34,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/otiai10/copy v1.10.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.27 // indirect
+	github.com/pierrec/lz4/v4 v4.1.28 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.10.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
