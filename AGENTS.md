@@ -22,7 +22,7 @@ The doctrine is the book's
 chapter; the procedure is limen's `skills/contribute`.
 
 - **Your own branch, in your own worktree**, cut from a fresh `main` and named after
-  you (`<bot>/<topic>`), one topic per branch and per pull request. The human's
+  you, dated (`<bot>/<YYYYMMDD>-<topic>`), one topic per branch and per pull request. The human's
   branches — `work`, and anything not named after you — are the human's: never commit
   there unless pairing interactively at their request, and never on `main`.
 - **Commits** are signed as you, with a DCO sign-off as you; when the change is the

@@ -193,8 +193,12 @@ jobs:
               },
               fileChanges: {additions: $additions, deletions: $deletions}}}}')"
           # GraphQL reports failure in-body over HTTP 200, so success is the
-          # presence of the new commit oid, never the HTTP status.
-          response="$(curl -sS -X POST -H "Authorization: bearer ${TOKEN}" \
+          # presence of the new commit oid, never the HTTP status. No --retry
+          # and no -L, on purpose: this is a mutation guarded by
+          # expectedHeadOid — a retry after a success that timed out on the
+          # way back would fail on the moved head and report a commit that
+          # landed as an error, and a redirect must never replay the POST.
+          response="$(curl --proto '=https' --tlsv1.2 -fsS -X POST -H "Authorization: bearer ${TOKEN}" \
             -d "${payload}" https://api.github.com/graphql)"
           oid="$(jq -r '.data.createCommitOnBranch.commit.oid // empty' <<<"${response}")"
           if [ -z "${oid}" ]; then

@@ -46,28 +46,28 @@
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.1.0/limen_0.1.0_darwin_arm64.tar.gz",
-      "checksum": "F08C845099CBB49AFB5E0E6E4FF0B2D9BD7EE3DA371358EB0DA68DC330521820",
+      "id": "github_release/github.com/farcloser/limen/v0.1.1/limen_0.1.1_darwin_arm64.tar.gz",
+      "checksum": "D8DDC5C7E43A4AA89B28F96428E70B823CD5CF43261708F04CE4ACE97CCCED9E",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.1.0/limen_0.1.0_linux_amd64.tar.gz",
-      "checksum": "EE88DC7AC3D004B99E1D38CF2E90E715AF29EF2B11FAC6A5ACEA53C55E655FB8",
+      "id": "github_release/github.com/farcloser/limen/v0.1.1/limen_0.1.1_linux_amd64.tar.gz",
+      "checksum": "C4C0759C726DB5EA0163202A18CA29C41FD5F4E252CAFD899699D14F4D8FAC3A",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.1.0/limen_0.1.0_linux_arm64.tar.gz",
-      "checksum": "F98A621D3613F42336EA1DC3B141E22C28AFDB071F370BEBA27DEC4EB06EEFDA",
+      "id": "github_release/github.com/farcloser/limen/v0.1.1/limen_0.1.1_linux_arm64.tar.gz",
+      "checksum": "EB986FC9ADF958BADFE883F5E1D23011B47CE5FA6CEDC040B145177E8EDC5BB9",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.1.0/limen_0.1.0_windows_amd64.tar.gz",
-      "checksum": "6919D7817CDFAE82AAE2096F4E9F3B8B2F52CEF90DB50A9B67A17E93CB1C25F8",
+      "id": "github_release/github.com/farcloser/limen/v0.1.1/limen_0.1.1_windows_amd64.tar.gz",
+      "checksum": "A7A48528B7C0DF7E399D0CB3E2508DDE2FF91A321A4E30B9B5FDBDBB427349F8",
       "algorithm": "sha256"
     },
     {
-      "id": "github_release/github.com/farcloser/limen/v0.1.0/limen_0.1.0_windows_arm64.tar.gz",
-      "checksum": "AD2239813F31E27ED1E0EEC411B553F37CD828DEB2FB55865C6F6F8F5F694085",
+      "id": "github_release/github.com/farcloser/limen/v0.1.1/limen_0.1.1_windows_arm64.tar.gz",
+      "checksum": "7ACEB56EC5B79CE2CC1AAD4C181C0CBD8C471266A6844B839893A8556FDD52A4",
       "algorithm": "sha256"
     },
     {
@@ -248,6 +248,31 @@
     {
       "id": "github_release/github.com/sigstore/cosign/v3.1.3/cosign-windows-amd64.exe",
       "checksum": "9FE59BE0ECA1271873CE019061335EB1AC419B7059202E797828467DDABE33BE",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/uutils/coreutils/0.11.0/coreutils-0.11.0-aarch64-apple-darwin.tar.gz",
+      "checksum": "9001127A01891F6E32547A72C0E27156D686310B0B42FDF23DA567288666ABB5",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/uutils/coreutils/0.11.0/coreutils-0.11.0-aarch64-pc-windows-msvc.zip",
+      "checksum": "6441A8326C8C210ACFFA23231B5B61C65A0F3BFE4D9EC45009C21CBA6689AB31",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/uutils/coreutils/0.11.0/coreutils-0.11.0-aarch64-unknown-linux-musl.tar.gz",
+      "checksum": "99405C97458C4B10382D8570108519188B5410A0E0E380C74B77CA7BF7EFD322",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/uutils/coreutils/0.11.0/coreutils-0.11.0-x86_64-pc-windows-msvc.zip",
+      "checksum": "622E4A764332EDBE8B4F6D9500938E649857A20A9A7F7D4FEA0487D479EB9B9E",
+      "algorithm": "sha256"
+    },
+    {
+      "id": "github_release/github.com/uutils/coreutils/0.11.0/coreutils-0.11.0-x86_64-unknown-linux-musl.tar.gz",
+      "checksum": "AC8E24885ABF9062B80E8E86990D5727C186939C02FEE777B1723E5C85293CA9",
       "algorithm": "sha256"
     },
     {

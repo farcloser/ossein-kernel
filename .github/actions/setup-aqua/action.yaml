@@ -38,7 +38,17 @@ runs:
         export AQUA_ROOT_DIR
         echo "AQUA_ROOT_DIR=${AQUA_ROOT_DIR}" >>"$GITHUB_ENV"
         tmp="$(mktemp -d)"
-        curl --proto '=https' --tlsv1.2 -fsSL -o "${tmp}/aqua-installer" \
+        # Retries for the transient failures a hosted runner meets. The
+        # windows curl (schannel) also refuses a handshake when the CA's
+        # revocation server is unreachable (CRYPT_E_REVOCATION_OFFLINE, exit
+        # 35, seen on more than one leg): best-effort revocation still
+        # rejects a certificate known to be revoked, only an unreachable
+        # server stops being fatal — and the sha256 below is what actually
+        # guards the installer. The flag is schannel-only, so windows-only.
+        revoke=()
+        [ "${RUNNER_OS:-}" != "Windows" ] || revoke=(--ssl-revoke-best-effort)
+        curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors "${revoke[@]}" \
+          -o "${tmp}/aqua-installer" \
           "https://raw.githubusercontent.com/aquaproj/aqua-installer/${AQUA_INSTALLER_VERSION}/aqua-installer"
         # No single digest tool exists everywhere: linux and windows git-bash
         # ship coreutils sha256sum, macOS ships perl shasum. (Nothing

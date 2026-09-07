@@ -88,3 +88,41 @@ packages:
       - darwin/arm64
       - linux
       - windows
+  # uutils/coreutils under the names recipes actually type. The standard
+  # registry exposes only the multicall binary as `coreutils`; this entry is
+  # the same current-shape asset with `sha256sum` and `base64` linked to it
+  # too — the binary dispatches on the name it is invoked as — so a bare
+  # `sha256sum` on the hermetic PATH is the pinned one on every platform, and
+  # nothing has to remember a `coreutils` prefix (book/recipes.md, "The
+  # execution environment is hermetic"). Carried locally until the extra
+  # names land upstream; when the asset naming changes upstream, this copy
+  # needs the same change. Upstream publishes no checksum file and no build
+  # provenance: the checksum aqua pins is verified by hand against GitHub's
+  # release attestation (`gh release verify-asset <tag> <asset>
+  # -R uutils/coreutils`) at every bump, until aqua can read that predicate.
+  - type: github_release
+    repo_owner: uutils
+    repo_name: coreutils
+    description: Cross-platform Rust rewrite of the GNU coreutils
+    asset: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}.{{.Format}}
+    format: tar.gz
+    replacements:
+      amd64: x86_64
+      arm64: aarch64
+      darwin: apple-darwin
+      linux: unknown-linux-musl
+      windows: pc-windows-msvc
+    overrides:
+      - goos: windows
+        format: zip
+    files:
+      - name: coreutils
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: sha256sum
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+      - name: base64
+        src: coreutils-{{.Version}}-{{.Arch}}-{{.OS}}/coreutils
+    supported_envs:
+      - darwin/arm64
+      - linux
+      - windows

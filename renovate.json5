@@ -8,7 +8,7 @@
   // the release like every other canonical file. limen itself, the preset's
   // author, reads it from its own default branch. Everything below is the
   // project's own — overrides and additions go here, next to the ref.
-  extends: ["github>farcloser/limen#v0.1.0"],
+  extends: ["github>farcloser/limen#v0.1.1"],
   // The update-aqua-checksum workflow pushes a fix-up commit onto Renovate's
   // branches; without this, Renovate treats the branch as human-modified and
   // stops rebasing it. The org's App identity is the org's, so the array
