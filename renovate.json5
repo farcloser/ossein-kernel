@@ -1,18 +1,11 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  // The canonical Renovate configuration is a shared preset — `default.json`
-  // in the limen repository — so every repository inherits it by reference
-  // and a fix there reaches all of them without a file being re-seeded. The
-  // ref is pinned: the `renovate` rule keeps it at the repository's own limen
-  // version (the farcloser/limen pin in aqua.yaml), so the preset moves with
-  // the release like every other canonical file. limen itself, the preset's
-  // author, reads it from its own default branch. Everything below is the
-  // project's own — overrides and additions go here, next to the ref.
+  // The ref is pinned to this repo's limen version (aqua.yaml); the `renovate`
+  // lint rule maintains it — do not bump it by hand.
   extends: ["github>farcloser/limen#v0.1.1"],
   // The update-aqua-checksum workflow pushes a fix-up commit onto Renovate's
   // branches; without this, Renovate treats the branch as human-modified and
-  // stops rebasing it. The org's App identity is the org's, so the array
-  // stays here (the `renovate` rule maintains it) rather than in the preset.
+  // stops rebasing it.
   gitIgnoredAuthors: [
     "300983632+limen-ci-farcloser[bot]@users.noreply.github.com",
     "41898282+github-actions[bot]@users.noreply.github.com",

@@ -22,7 +22,6 @@ LOCALVERSION="${LOCALVERSION:?required: kernel version suffix}"
 SUITE="${OSSEIN_DEBIAN_SUITE:?required (e.g. trixie) — must match the base image codename}"
 SNAPSHOT="${OSSEIN_APT_SNAPSHOT:?required — snapshot.debian.org archive timestamp, e.g. 20260701T025158Z}"
 
-# arm64 ONLY
 case "$(uname -m)" in
   aarch64|arm64) ;;
   *) echo "ossein builds its arm64 guest kernel natively; build VM is $(uname -m), not arm64" >&2; exit 1 ;;
@@ -112,11 +111,8 @@ tar -xf /kernel/source.tar.xz -C /kbuild --strip-components=1
 (
   cd /kbuild
 
-  # Patches — kernel/patches/*.patch from the repo, staged at /kernel/patches. The source
-  # tarball stays PRISTINE (pinned url + sha256); our deltas live as explicit, reviewable patch
-  # files rather than a fork. Applied in lexical order, before anything is configured or built.
-  # --forward + set -e means a patch that no longer applies FAILS THE BUILD on a kernel bump,
-  # rather than silently vanishing — the same "fail on drift" contract as the config check.
+  # --forward under set -e: a patch that stops applying fails the build on a kernel bump
+  # instead of silently vanishing.
   if [ -d /kernel/patches ]; then
     for p in /kernel/patches/*.patch; do
       [ -e "$p" ] || break   # no nullglob: an empty dir yields the literal glob
@@ -125,17 +121,10 @@ tar -xf /kernel/source.tar.xz -C /kbuild --strip-components=1
     done
   fi
 
-  # perf (cross-runtime bench tooling) — built FIRST so a perf problem fails fast, before the
-  # long kernel compile. tools/perf ships in the kernel source and builds independently of the
-  # kernel .config; build it with the same pinned clang and disable EVERY optional library
-  # (NO_LIB*/NO_JEVENTS). `perf bench` (sched/syscall/futex/epoll/mem — the cross-runtime
-  # latency probes) is pure libc, so this pulls in no extra apt -dev packages and the binary
-  # runs in any plain debian container (just mount + exec it). NO_JEVENTS drops the pmu-events
-  # JSON generation (needs a `python` interpreter + is only for `perf stat`/`record`, not bench).
-  # Host tools (fixdep) link through the clang driver, and in the tools/ build that link reads
-  # KBUILD_HOSTLDFLAGS — NOT HOSTLDFLAGS — so -fuse-ld=lld must go there or clang hunts for a GNU
-  # `ld` we don't ship (posix_spawn: No such file). LDFLAGS covers perf's own (native) link.
-  # set -e fails the build on any error (unknown NO_* vars are harmless no-ops to make).
+  # perf first, so a perf failure fails fast. All optional libs off (NO_*) so the binary runs
+  # in a plain debian container. KBUILD_HOSTLDFLAGS, not HOSTLDFLAGS, is what the tools/ build
+  # reads for the fixdep link — without -fuse-ld=lld there, clang hunts for a GNU ld we do
+  # not ship.
   PERF_NO="NO_JEVENTS=1 NO_LIBELF=1 NO_LIBDW=1 NO_LIBUNWIND=1 NO_LIBTRACEEVENT=1 NO_LIBTRACEFS=1 \
 NO_SLANG=1 NO_LIBPYTHON=1 NO_LIBPERL=1 NO_LIBNUMA=1 NO_LIBCAP=1 NO_LIBBPF=1 NO_BPF_SKEL=1 \
 NO_LIBCRYPTO=1 NO_JVMTI=1 NO_LZMA=1 NO_ZSTD=1 NO_LIBZSTD=1 NO_DEMANGLE=1 NO_AUXTRACE=1 \
@@ -207,7 +196,6 @@ NO_CAPSTONE=1 NO_LIBPFM4=1 NO_LIBDEBUGINFOD=1"
   done < /kernel/kernel-fragment
   [ "$drift" -eq 0 ] || { echo "config drift after olddefconfig — aborting before promote" >&2; exit 1; }
 
-  # Plain lines (set -e aborts on any failure) — clearer in CI than a chained &&.
   # shellcheck disable=SC2086  # intentional word-split of MAKEARGS
   make -s ${MAKEARGS} HOSTLDFLAGS="${HOST_LDFLAGS}" -j"$(nproc)" LOCALVERSION="${LOCALVERSION}"
   cp "${IMAGE_PATH}" "/kernel/${OUTPUT_NAME}"
