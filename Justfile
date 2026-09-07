@@ -3,11 +3,8 @@
 # The import must be kept: it mounts every shared limen task under `just do ...`.
 import '.limen/just/main.just'
 
-# ossein-kernel builds the ossein guest kernel STANDALONE — it links
-# Virtualization.framework directly (Code-Hex/vz) and provides its own microVM boot
-# (internal/vm), Debian root disk (internal/rootfs), and guest init
-# (cmd/ossein-kernel/init), with no dependency on the ossein runtime. CGO is mandatory
-# for VZ and the host binary is darwin/arm64-only; the init is static linux/arm64.
+# CGO is mandatory (Code-Hex/vz links Virtualization.framework) and the host binary is
+# darwin/arm64-only; the init is static linux/arm64.
 export CGO_ENABLED := '1'
 
 # go-licenses false-positives our own GPL-2.0 module once first-party code spans
@@ -27,9 +24,8 @@ guest_pkgs := "./cmd/ossein-kernel/init/..."
 # The FIRST recipe defined here becomes `just`'s default.
 lint: do::lint::default do::lint::go::default do::lint::go::deadcode
     {{ guest_env }} golangci-lint run {{ guest_pkgs }}
-    # govulncheck is a go.mod tool now (limen ≥ 0.1.0); the shared vuln recipe
-    # this depends on has already built it natively into build/tools/, and that
-    # binary runs under the guest GOOS like the shared per-GOOS legs do.
+    # build/tools/govulncheck is built natively by the shared vuln leg this recipe
+    # depends on; run it, not a PATH one.
     {{ guest_env }} build/tools/govulncheck {{ guest_pkgs }}
 
 fix: do::fix::default do::fix::go::default
@@ -40,7 +36,7 @@ test:
 # by internal/rootfs. Mirrors `do build go`'s release flags (trimpath, netgo/osusergo,
 # stripped, git-describe version stamp) EXCEPT -buildmode=pie: with CGO=0 that yields a
 # DYNAMIC pie needing /lib/ld-linux-aarch64.so.1, but PID 1 must be self-contained, so the
-# init stays STATICALLY linked (as ossein's own vminitd was). Cross-compiled to the guest arch.
+# init stays STATICALLY linked. Cross-compiled to the guest arch.
 build-init:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -49,43 +45,24 @@ build-init:
         -ldflags "-s -w -X main.version=${version}" -o build/ossein-init ./cmd/ossein-kernel/init
 
 build: build-init
-    CGO_ENABLED=1 just do build go   # shared reproducible build (trimpath, stamped, PIE, stripped); CGO for VZ
+    CGO_ENABLED=1 just do build go
     codesign --force --sign - --timestamp=none --entitlements vz.entitlements build/ossein-kernel
 all: kernel kernel-debug kernel-nopatch
 
-# ---------------------------------------------------------------------------
-# Guest kernel factory. This project OWNS everything it needs: source pins, config fragment,
-# patches (kernel/patches/), the build/verify recipes, AND the whole build environment —
-# microVM boot (internal/vm), the Debian root disk built from the pinned image
-# (internal/rootfs), and the guest init (cmd/ossein-kernel/init). No dependency on ossein.
-# Everything WE build (kernel, perf, init, root disk, scratch) lands in ./build.
-# ---------------------------------------------------------------------------
-
-# Pinned guest kernel source (passed explicitly to ossein-kernel). Latest stable.
+# Pinned guest kernel source (passed explicitly to ossein-kernel).
 kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz"
 kernel_source_sha256 := "22a0196b3cbcdf34dc27b77561f4d040585fd3447edc9ab3531a1ac79e3041e7"
 
-# Kernel build container (throwaway build VM only; nothing guest-facing), PINNED for
-# reproducibility on FOUR axes, ALL passed down to build.sh: the base image by DIGEST,
-# the Debian SUITE (codename), every apt package to an immutable Debian SNAPSHOT
-# (build.sh rewrites sources to snapshot.debian.org @ the timestamp), and the CLANG
-# toolchain to an exact release tarball (see kernel_llvm_* below). image/suite/snapshot
-# must agree — kernel_debian_suite must match the image's codename (trixie-slim → trixie).
-# Pulled via mirror.gcr.io (Google's transparent Docker Hub mirror): anonymous, NOT
-# Hub-rate-limited, digest-preserving — so this pinned public base needs no credential
-# helper (ossein's general `run`/`pull` keeps full Hub auth). Re-pin for newer:
-# `crane digest debian:trixie-slim` for the digest; bump kernel_apt_snapshot.
+# Build container, pinned on four axes and ALL passed to build.sh: image digest, Debian
+# suite, apt snapshot, clang tarball. kernel_debian_suite MUST match the image's codename.
+# mirror.gcr.io: anonymous, not Hub-rate-limited, digest-preserving. Re-pin with
+# `crane digest debian:trixie-slim` and bump kernel_apt_snapshot.
 kernel_build_image := "mirror.gcr.io/library/debian@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd"
 kernel_debian_suite := "trixie" # apt suite/codename; MUST match the image
 kernel_apt_snapshot := "20260701T025158Z" # snapshot.debian.org archive timestamp
 
-# clang/LLVM toolchain, pinned to an EXACT official release tarball (url + sha256), NOT
-# apt's clang-NN. apt.llvm.org is a rolling repo (only the newest build per major is kept,
-# no snapshot archive) — it pins the major only. The github.com/llvm/llvm-project release
-# asset pins the full version forever, so the compiler is as reproducible as every other
-# input. ossein-kernel downloads + verifies it host-side, stages it in, build.sh extracts
-# it and builds with LLVM=1. Re-pin for a newer clang: pick a newer LLVM-<ver>-Linux-ARM64
-# asset and update both URL + sha256 (the GitHub API publishes the asset "digest").
+# An exact LLVM release tarball, not apt's clang-NN: apt.llvm.org keeps only the newest
+# build per major, so it pins the major only. Bump URL and sha256 together.
 kernel_llvm_url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-ARM64.tar.xz"
 kernel_llvm_sha256 := "805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34"
 
@@ -114,17 +91,11 @@ kernel_kata_sha256 := "8736c054d9223974735394f822000823baef509e1c33405ec798240fa
 # build.sh reject empty) so a build is never silently unlabeled — always identifiable.
 kernel_localversion := "ossein"
 
-# Guest init for the build VM: WE build it (`just build-init` → build/ossein-init), a static
-# linux/arm64 binary internal/rootfs embeds in the Debian root disk. No ossein artifact needed.
 ossein_init := "build/ossein-init"
 
-# Build the guest kernel standalone: boot a microVM (internal/vm) on the seed/self-host kernel,
-# root it on a Debian ext4 built from the pinned image (internal/rootfs), run build.sh via our
-# own init. Links Virtualization.framework and MUST be codesigned with the vz entitlement.
-# Source in kernel/ + the fragment; output + scratch in build/. The init is built by `build`.
-# localversion defaults to the bare flavor (`ossein` → uname 7.1.3-ossein) for dev builds;
-# `release-kernel` overrides it with the tag's flavor.rev (ossein.3) so a released kernel's
-# uname -r equals its release tag (distro-style, self-identifying at runtime).
+# Boots a real VM: the binary MUST be codesigned with the vz entitlement (see `build`).
+# `release-kernel` overrides localversion with the tag's flavor.rev so uname -r equals the
+# release tag.
 kernel localversion=kernel_localversion: build
     build/ossein-kernel \
         --init "{{ ossein_init }}" \
@@ -214,19 +185,17 @@ kernel-golden kernel="build/kernel-arm64":
     echo "wrote kernel/config/kernel-golden ($(wc -l < kernel/config/kernel-golden | tr -d ' ') symbols)"
 
 # ---------------------------------------------------------------------------
-# Release. We publish the BUILT KERNEL, not the tooling: the builder (ossein-kernel) and the
-# guest init are repo-internal build scaffolding, wired up by `just build`, and have no
-# standalone consumer. The kernel is the product — ossein (and any VZ user) points
-# OSSEIN_KERNEL= at the blob. This runs LOCALLY: the build boots a real VM on
-# Virtualization.framework (arm64 + the vz entitlement) and cannot run on stock CI, so
-# goreleaser's build-in-CI model doesn't fit — a thin recipe that signs + publishes an
-# already-built, boot-verified artifact does.
+# Release. The kernel is the product; the builder and init are not published. Runs LOCALLY:
+# the build boots a VZ VM, which no stock CI runner can, so `just do release`/goreleaser does
+# not fit — this signs and publishes an already boot-verified blob.
 # ---------------------------------------------------------------------------
 
-# The maintainer's keyless-signing identity (sigstore/Fulcio SAN) and OIDC issuer. Consumers
-# verify a released kernel against these EXACT values — a build signed by any other identity or
-# issuer is not ours. Read from the signing cert; update both if the signer/provider changes.
-maintainer_identity := "apostasie@farcloser.world"
+# Who signed a release: a REGEXP over the certificate SAN, anchored on the GitHub user id
+# (mirrors ossein's guest_kernel_identity). With keyless signing the email claim is mutable
+# account state — the email-privacy toggle flips it between apostasie@farcloser.world and
+# 142371135+…@users.noreply.github.com (7.1.5-ossein.2 carries the latter); the numeric id
+# is not. Consumers verify against this and the issuer; update both if the signer changes.
+maintainer_identity_regexp := '^(142371135\+[^@]+@users\.noreply\.github\.com|apostasie@farcloser\.world)$'
 maintainer_oidc_issuer := "https://github.com/login/oauth"
 
 # Cut a kernel release: (re)build + boot-verify, then publish build/kernel-arm64 + perf-arm64
@@ -236,8 +205,9 @@ maintainer_oidc_issuer := "https://github.com/login/oauth"
 # (e.g. 7.1.3-ossein.1) — the version MUST match the pinned kernel source; bump <rev> for a
 # rebuild of the same upstream (config/patch/toolchain change), reset to 1 on a source bump.
 # NO leading "v": a v-prefixed hyphen-suffixed tag parses as a SemVer PRE-release (sorts BEFORE
-# X.Y.Z), which loses GitHub's "Latest" and misleads Renovate/sort -V. Signing opens a browser
-# for the OIDC flow.
+# X.Y.Z), which loses GitHub's "Latest" and misleads Renovate/sort -V. The git tag is signed
+# (your key signs the intent, as in the shared release lane); cosign opens a browser for the
+# OIDC flow.
 # just release-kernel 7.1.3-ossein.1
 release-kernel tag:
     #!/usr/bin/env bash
@@ -291,7 +261,7 @@ release-kernel tag:
         echo "## Verify"
         echo '```'
         echo "cosign verify-blob --bundle SHA256SUMS.cosign.bundle \\"
-        echo "  --certificate-identity {{ maintainer_identity }} \\"
+        echo "  --certificate-identity-regexp '{{ maintainer_identity_regexp }}' \\"
         echo "  --certificate-oidc-issuer {{ maintainer_oidc_issuer }} SHA256SUMS"
         echo "shasum -a 256 -c SHA256SUMS"
         echo '```'
@@ -318,7 +288,7 @@ release-kernel tag:
     } > "$rel/NOTES.md"
 
     # --- tag, push, publish (only now, after everything above succeeded) ---
-    git tag -a "$tag" -m "$tag"
+    git tag -s "$tag" -m "$tag"
     git push origin HEAD
     git push origin "refs/tags/$tag"
     gh release create "$tag" --verify-tag --title "$tag" --notes-file "$rel/NOTES.md" \
