@@ -11,7 +11,7 @@ require (
 	github.com/insomniacslk/dhcp v0.0.0-20260901064844-234b97448fae
 	github.com/mycophonic/primordium v0.9.0
 	github.com/vishvananda/netlink v1.3.1
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
