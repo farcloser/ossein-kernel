@@ -4,56 +4,8 @@
 # Addition of non-standard tools can be discussed on https://github.com/farcloser/limen
 
 packages:
-  # Every go_install entry names its GitHub repo (repo_owner/repo_name): that
-  # is where aqua lists versions from (`aqua update`, hence
-  # `just do tools update <cmd>`), and without it the update is a silent no-op.
-  # Naming the repo changes aqua's default package name to owner/repo, so
-  # `name:` is spelled out as the import path every time — the name aqua.yaml
-  # pins under.
-  #
-  # Only tools that never load Go source belong here. The Go-source analyzers
-  # (deadcode, govulncheck, go-licenses) are go.mod `tool` directives instead
-  # (see book/tooling.md, "Go-source analyzers are go.mod tools"): aqua builds
-  # a go_install package once per tool version, with whichever project's
-  # pinned go ran it first, then shares that binary — an analyzer built by
-  # go1.N cannot read a module declaring go1.N+1. Listing one of them here
-  # again would reopen exactly that hole; limen retires them (the aqua rule).
-  - type: go_install
-    name: github.com/vbatts/git-validation
-    path: github.com/vbatts/git-validation
-    repo_owner: vbatts
-    repo_name: git-validation
-    description: Validate git commit rules (DCO sign-off, subject length, …)
-    version_source: github_tag
-  # Graphviz `dot` as a single static Go binary: the real graphviz C code
-  # compiled to WASM, executed via wazero — no C toolchain, no shared
-  # libraries, which is why this can live in aqua while system graphviz
-  # cannot. Renders the PNGs of `just do test go profile`. The cmd/dot module is
-  # nested and untagged upstream, hence the pseudo-version pin in aqua.yaml.
-  # Its versions, when upstream ever tags it, will be the nested-module tags
-  # `cmd/dot/vX.Y.Z` (Go's convention) — so that is the only shape aqua may
-  # propose: the root module's v0.2.x tags do not contain cmd/dot and would
-  # break the install. Until such a tag exists `aqua update dot` finds nothing
-  # and leaves the pin alone.
-  - type: go_install
-    name: github.com/goccy/go-graphviz/cmd/dot
-    path: github.com/goccy/go-graphviz/cmd/dot
-    repo_owner: goccy
-    repo_name: go-graphviz
-    description: Graphviz dot CLI, pure-Go build (WASM via wazero)
-    version_source: github_tag
-    version_prefix: cmd/dot/
-    version_filter: Version startsWith "cmd/dot/"
-  # hadolint as pure Go, from the farcloser stable. The binary is the nested
-  # cmd/godolint package of the root module — explicit name and repo, same
-  # shape as go-graphviz's cmd/dot above (tags live at the repo root).
-  - type: go_install
-    name: github.com/farcloser/godolint/cmd/godolint
-    path: github.com/farcloser/godolint/cmd/godolint
-    repo_owner: farcloser
-    repo_name: godolint
-    description: Lint Dockerfiles (a pure-Go port of hadolint)
-    version_source: github_tag
+  # No go_install entries: every Go-built tool is a tool directive in
+  # tools/go.mod (book/tooling.md, "Go-built tools are go.mod tools").
   # limen itself: every repo pins the version that enforces it, so the binary
   # and the canonical files it embeds travel together (no version skew between
   # the checker and the checked). Graduates to the standard registry once
@@ -70,11 +22,9 @@ packages:
       type: github_release
       asset: checksums.txt
       algorithm: sha256
-      # Signatures are verified whenever upstream publishes them (see the
-      # book's signature doctrine): the release signs checksums.txt keyless
-      # from CI (goreleaser cosign lane), which transitively covers every
-      # asset the file lists. The identity IS the release workflow at the
-      # exact tag — a bundle signed by anything else fails the install.
+      # Signed keyless from CI: the bundle over checksums.txt transitively
+      # covers every listed asset, and the identity IS the release workflow at
+      # the exact tag — anything else fails the install.
       cosign:
         bundle:
           type: github_release
@@ -88,18 +38,14 @@ packages:
       - darwin/arm64
       - linux
       - windows
-  # uutils/coreutils under the names recipes actually type. The standard
-  # registry exposes only the multicall binary as `coreutils`; this entry is
-  # the same current-shape asset with `sha256sum` and `base64` linked to it
-  # too — the binary dispatches on the name it is invoked as — so a bare
-  # `sha256sum` on the hermetic PATH is the pinned one on every platform, and
-  # nothing has to remember a `coreutils` prefix (book/recipes.md, "The
-  # execution environment is hermetic"). Carried locally until the extra
-  # names land upstream; when the asset naming changes upstream, this copy
-  # needs the same change. Upstream publishes no checksum file and no build
-  # provenance: the checksum aqua pins is verified by hand against GitHub's
-  # release attestation (`gh release verify-asset <tag> <asset>
-  # -R uutils/coreutils`) at every bump, until aqua can read that predicate.
+  # uutils/coreutils under the names recipes type: the binary dispatches on
+  # argv[0], so `sha256sum` and `base64` link to it and a bare name on the
+  # hermetic PATH is the pin on every platform. Carried locally until the
+  # extra names land upstream; when upstream's asset naming changes, this copy
+  # needs the same edit. Upstream publishes no checksum file and no
+  # provenance: verify each asset against GitHub's release attestation at
+  # every bump (`gh release verify-asset <tag> <asset> -R uutils/coreutils`),
+  # which aqua cannot check itself.
   - type: github_release
     repo_owner: uutils
     repo_name: coreutils

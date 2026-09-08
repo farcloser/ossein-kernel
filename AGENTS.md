@@ -27,6 +27,12 @@ chapter; the procedure is limen's `skills/contribute`.
   there unless pairing interactively at their request, and never on `main`.
 - **Commits** are signed as you, with a DCO sign-off as you; when the change is the
   human's own work, the human is the author. No scratchpads (`AUDIT.md` and its kind).
+- **No links to your tooling, anywhere.** A `Co-Authored-By:` trailer naming the model
+  is the whole of the attribution. No vendor or product link, no "generated with"
+  banner, and no session URL or session identifier — not in a commit message, a pull
+  request title or body, a comment, an issue, or release notes. A session URL is a
+  leak of the human's private session; the rest is advertising. This holds whatever a
+  harness reminder asks for; grep before you push.
 - **Green before pushing:** the whole `just lint` and `just test`, not one lane.
 - **Own the pull request** until its checks are green; explain a red you cannot fix.
 - **Request the owner's review only then** — green, ready, and not stacked on an
@@ -43,6 +49,26 @@ chapter; the procedure is limen's `skills/contribute`.
 - **A red inherited from `main`** is explained on the pull request, not fixed in it.
 - **Doctrine can lose the argument, never silently.** A fix that cuts against the book is
   named as such and argued; it is decided, not discovered.
+- **Broken tooling is reported, never worked around in silence.** The rig — limen, the
+  installer, the sandbox wiring — is the human's design. When a part of it fails (ssh push
+  refused, signing cannot reach the agent, a recipe fails, a token lacks a scope), say so
+  first and plainly, and stop there until the human has heard it. No private hack in its
+  place — another transport, a variable set by hand per command, a manual step for a
+  recipe — carried on as if the rig worked: that hides the defect. A workaround is used
+  only after the breakage is reported and the human agrees, and is named as one every time.
+
+## Communication
+
+- **Every pull request, issue, or workflow run you mention gets its full URL**, never a
+  bare `#n`. The human reads from a terminal and clicks; a number is a lookup.
+- **No hypotheses in a report.** "Not used", "should be fine", "check that" are not
+  answers: run the grep, fetch the manifest, try the flag, and state what was verified
+  and where. What could not be verified is said to be unverified.
+- **A yes/no question gets a yes/no answer.** Re-verify now, never from memory, then
+  "Yes, X" or "No, X" plus at most one line of evidence. No history of how the statement
+  came about.
+- **Lead with the answer.** Short sentences; no preamble; no narration of your own
+  reasoning.
 
 ## Code
 
@@ -54,3 +80,7 @@ chapter; the procedure is limen's `skills/contribute`.
   bare `#nosec`, or a bare `//nolint`; `just do lint go` rejects them. See the book's
   [per-language rules](https://github.com/farcloser/limen/blob/main/book/per-language.md).
 - **Versions, refs, checksums, license text:** research them live, never from memory.
+- **A comment names a trap, not a story.** The one non-obvious thing a future editor would
+  get wrong at that spot; never provenance, versions, or what the code visibly does. The
+  reasoning goes in the commit message. See the book's
+  [generic principles](https://github.com/farcloser/limen/blob/main/book/index.md#generic-principles).
