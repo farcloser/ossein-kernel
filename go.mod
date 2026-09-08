@@ -6,7 +6,7 @@ require (
 	github.com/Code-Hex/vz/v3 v3.7.1
 	github.com/alecthomas/kong v1.16.1
 	github.com/diskfs/go-diskfs v1.9.4
-	github.com/forkcloser/xz v0.0.0-20260907063006-1c9272beda0e
+	github.com/forkcloser/xz v0.0.0-20260908053825-bf5755e5c3d8
 	github.com/google/go-containerregistry v0.22.1
 	github.com/insomniacslk/dhcp v0.0.0-20260901064844-234b97448fae
 	github.com/mycophonic/primordium v0.9.0
