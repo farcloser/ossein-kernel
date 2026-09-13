@@ -22,8 +22,8 @@ github.com/docker/docker-credential-helpers v0.9.8 h1:bIREROb7So6PRlq6KTtdS9MPEj
 github.com/docker/docker-credential-helpers v0.9.8/go.mod h1:v1S+hepowrQXITkEfw6o4+BMbGot02wiKpzWhGUZK6c=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57 h1:x5yxNrq8XffV/OoNUeFPM6hxHVi5OTspSTBxr/9pemg=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57/go.mod h1:GLo/8fDswSAniFG+BFIaiSPcK610jyzgEhWYPQwuQdw=
-github.com/forkcloser/xz v0.0.0-20260913050027-1fe2f7f45fe3 h1:eAxEHP47aMh+uYrnGFl/3jdpKjCPwOe/l0sPSL/Cf/A=
-github.com/forkcloser/xz v0.0.0-20260913050027-1fe2f7f45fe3/go.mod h1:97jHfaW5ugdlASYSsIlWK2tohamE+Jh5ouA78TH92sU=
+github.com/forkcloser/xz v0.0.0-20260913062521-f3142c14ef66 h1:I6sVwRT2pTHXnUzPZRtlMF+K7VSOzyfuq6Dea7xswc0=
+github.com/forkcloser/xz v0.0.0-20260913062521-f3142c14ef66/go.mod h1:97jHfaW5ugdlASYSsIlWK2tohamE+Jh5ouA78TH92sU=
 github.com/go-test/deep v1.1.1 h1:0r/53hagsehfO4bzD2Pgr/+RgHqhmf+k1Bpse2cTu1U=
 github.com/go-test/deep v1.1.1/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
