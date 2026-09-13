@@ -58,7 +58,7 @@ require (
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
-	golang.org/x/vuln v1.7.0 // indirect
+	golang.org/x/vuln v1.8.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 	mvdan.cc/sh/v3 v3.12.0 // indirect
