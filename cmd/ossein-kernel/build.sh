@@ -128,7 +128,7 @@ tar -xf /kernel/source.tar.xz -C /kbuild --strip-components=1
   PERF_NO="NO_JEVENTS=1 NO_LIBELF=1 NO_LIBDW=1 NO_LIBUNWIND=1 NO_LIBTRACEEVENT=1 NO_LIBTRACEFS=1 \
 NO_SLANG=1 NO_LIBPYTHON=1 NO_LIBPERL=1 NO_LIBNUMA=1 NO_LIBCAP=1 NO_LIBBPF=1 NO_BPF_SKEL=1 \
 NO_LIBCRYPTO=1 NO_JVMTI=1 NO_LZMA=1 NO_ZSTD=1 NO_LIBZSTD=1 NO_DEMANGLE=1 NO_AUXTRACE=1 \
-NO_CAPSTONE=1 NO_LIBPFM4=1 NO_LIBDEBUGINFOD=1"
+NO_CAPSTONE=1 NO_LIBPFM4=1 NO_LIBDEBUGINFOD=1 NO_BABELTRACE2=1"
   echo ">> building perf (bench tooling; all optional libs off) ..."
   # -f Makefile.perf skips tools/perf/Makefile, the -j wrapper — it does `unexport MAKEFLAGS`,
   # which drops our -s before the recursion (command-line vars still get through, so the NO_*

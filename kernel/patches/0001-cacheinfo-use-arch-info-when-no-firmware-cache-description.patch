@@ -18,29 +18,37 @@ On a 2-vCPU guest, perf bench sched pipe costs ~6.7 usecs/op versus ~0.9 when
 the pair shares a CPU.
 
 Commit "cacheinfo: Correctly fallback to using clidr_el1's information" handles
-a DT that is present but advertises no cache properties. It does not handle a
-DT that does not register as present at all. Arm the arch fallback for that case
-too, so the clidr_el1 information is used.
+a DT that is present but advertises no cache properties, and 7.2's "cacheinfo:
+don't propagate DT/ACPI error when arch supplies info (arm64)" clears the error
+in that same case. Neither handles a DT that does not register as present at
+all. Arm the arch fallback for that case too, so the clidr_el1 information is
+used.
 
 Signed-off-by: ossein <ossein@localhost>
 
 --- a/drivers/base/cacheinfo.c
 +++ b/drivers/base/cacheinfo.c
-@@ -383,7 +383,16 @@
+@@ -401,14 +401,22 @@
+ 	else if (!acpi_disabled)
  		ret = cache_setup_acpi(cpu);
  
- 	// Assume there is no cache information available in DT/ACPI from now.
--	if (ret && use_arch_cache_info())
-+	// This includes the case where the firmware describes no caches AT ALL:
-+	// of_have_populated_dt() is of_property_present(of_root, "compatible"), so a
-+	// DT whose root lacks a "compatible" property (e.g. the one Apple's
-+	// Virtualization.framework hands its guests) reads as "no DT" here. Both
-+	// branches above are then skipped, ret stays 0, use_arch_info is never armed,
-+	// and cache_leaves_are_shared() falls through to comparing fw_token — which is
-+	// NULL for every leaf, so NULL == NULL marks every cache shared by every CPU
-+	// (a 4-vCPU guest reports its L1 shared across all 4). Arm the arch fallback
-+	// for that case too, so the clidr_el1 information is used instead.
-+	if ((ret || (!of_have_populated_dt() && acpi_disabled)) && use_arch_cache_info())
+ 	/*
+ 	 * No DT/ACPI cache nodes; fall back to arch-derived topology (e.g.
+ 	 * arm64 CLIDR_EL1) and clear the error to avoid a spurious warning.
++	 *
++	 * That includes firmware describing no caches AT ALL: of_have_populated_dt()
++	 * is of_property_present(of_root, "compatible"), so a DT whose root lacks a
++	 * "compatible" property (the one Apple's Virtualization.framework hands its
++	 * guests) reads as "no DT" here. Both branches above are then skipped, ret
++	 * stays 0, use_arch_info is never armed, and cache_leaves_are_shared() falls
++	 * through to comparing fw_token, NULL for every leaf, so every cache reads
++	 * as shared by every CPU. Arm the arch fallback for that case too.
+ 	 */
+-	if (ret && use_arch_cache_info()) {
++	if ((ret || (!of_have_populated_dt() && acpi_disabled)) && use_arch_cache_info()) {
  		use_arch_info = true;
+ 		ret = 0;
+ 	}
  
  	return ret;
+ }
