@@ -49,20 +49,30 @@ build: build-init
     codesign --force --sign - --timestamp=none --entitlements vz.entitlements build/ossein-kernel
 all: kernel kernel-debug kernel-nopatch
 
-# Pinned guest kernel source (passed explicitly to ossein-kernel).
+# Download pins. Renovate bumps the version in each URL (renovate.json); the sha256 next to
+# it does not follow — `just refresh-pins` recomputes every one from its authoritative source
+# and rewrites this file. The build refuses a mismatch.
+
+# Pinned guest kernel source (passed explicitly to ossein-kernel). The sha256 is the entry
+# for this tarball in the series directory's sha256sums.asc, which kernel.org clearsigns
+# with its autosigner key: refresh-pins verifies that signature against the vendored key,
+# pinned here by fingerprint, before trusting a line of it.
 kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz"
 kernel_source_sha256 := "22a0196b3cbcdf34dc27b77561f4d040585fd3447edc9ab3531a1ac79e3041e7"
+kernel_autosigner_key := "kernel/keys/autosigner.asc"
+kernel_autosigner_fingerprint := "B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1"
 
 # Build container, pinned on four axes and ALL passed to build.sh: image digest, Debian
 # suite, apt snapshot, clang tarball. kernel_debian_suite MUST match the image's codename.
-# mirror.gcr.io: anonymous, not Hub-rate-limited, digest-preserving. Re-pin with
-# `crane digest debian:trixie-slim` and bump kernel_apt_snapshot.
-kernel_build_image := "mirror.gcr.io/library/debian@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd"
+# mirror.gcr.io: anonymous, not Hub-rate-limited, digest-preserving. The tag is what Renovate
+# tracks; the digest is the pin, and Renovate moves it. Bump kernel_apt_snapshot alongside.
+kernel_build_image := "mirror.gcr.io/library/debian:trixie-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd"
 kernel_debian_suite := "trixie" # apt suite/codename; MUST match the image
 kernel_apt_snapshot := "20260701T025158Z" # snapshot.debian.org archive timestamp
 
 # An exact LLVM release tarball, not apt's clang-NN: apt.llvm.org keeps only the newest
-# build per major, so it pins the major only. Bump URL and sha256 together.
+# build per major, so it pins the major only. The sha256 is of the bytes GitHub's artifact
+# attestation for the asset vouches for (refresh-pins downloads and verifies it).
 kernel_llvm_url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-ARM64.tar.xz"
 kernel_llvm_sha256 := "805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34"
 
@@ -80,8 +90,8 @@ kernel_patches := "kernel/patches"
 
 # Kata bootstrap kernel: the COLD-START seed only — used once, to boot the very first build
 # VM before the factory can self-host on its own output. Pinned by URL + sha256 like every
-# other download (GitHub publishes the asset digest: `gh api …/releases/tags/<v>`). After
-# the first successful build, --out exists and this is never fetched again.
+# other download, the sha256 attested like LLVM's. After the first successful build, --out
+# exists and this is never fetched again.
 kernel_kata_url := "https://github.com/kata-containers/kata-containers/releases/download/3.32.0/kata-static-3.32.0-arm64.tar.zst"
 kernel_kata_sha256 := "8736c054d9223974735394f822000823baef509e1c33405ec798240fa9b6e4b5"
 
@@ -92,6 +102,47 @@ kernel_kata_sha256 := "8736c054d9223974735394f822000823baef509e1c33405ec798240fa
 kernel_localversion := "ossein"
 
 ossein_init := "build/ossein-init"
+
+# Recompute every download sha256 above from its authoritative source and rewrite this file.
+# Run after a version bump (Renovate's or yours), then commit the Justfile. The LLVM and Kata
+# assets are downloaded whole (GiBs): GitHub's attestation is over the bytes, not a published
+# digest, so the digest is taken from the verified download. Needs `gh` signed in.
+refresh-pins: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+    fetch() { curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-delay 3 --retry-all-errors -o "$2" "$1"; }
+    # pin <variable> <sha256>: rewrite that one `name := "…"` line.
+    pin() {
+        grep -qE "^$1 := \"[0-9a-f]{64}\"$" Justfile || { echo "refresh-pins: no $1 line to rewrite" >&2; exit 1; }
+        sed -i.bak -E "s|^($1 := \")[0-9a-f]{64}(\")$|\1$2\2|" Justfile && rm Justfile.bak
+        echo ">> $1 = $2"
+    }
+    # Kernel: the series directory's sha256sums.asc, clearsigned by kernel.org's autosigner.
+    tarball="$(basename "{{ kernel_source_url }}")"
+    fetch "$(dirname "{{ kernel_source_url }}")/sha256sums.asc" "$tmp/sha256sums.asc"
+    sum="$(build/clearsign-verify "{{ kernel_autosigner_key }}" "{{ kernel_autosigner_fingerprint }}" "$tmp/sha256sums.asc" \
+        | awk -v f="$tarball" '$2 == f { print $1 }')"
+    [ -n "$sum" ] || { echo "refresh-pins: no $tarball in the signed sha256sums.asc" >&2; exit 1; }
+    pin kernel_source_sha256 "$sum"
+    # attested <url> <verify…>: download, run the given verifier on the file, print sha256.
+    # Each step is checked by hand: `set -e` does not reach into a command substitution.
+    attested() {
+        local f
+        f="$tmp/$(basename "$1")"
+        fetch "$1" "$f" || return 1
+        "${@:2}" "$f" >&2 || return 1
+        sha256sum "$f" | cut -d' ' -f1
+    }
+    # LLVM's own workflow attests its assets (SLSA provenance); Kata's are attested by GitHub
+    # as an immutable release, which `gh attestation verify` does not see.
+    sum="$(attested "{{ kernel_llvm_url }}" gh attestation verify --owner llvm)" \
+        || { echo "refresh-pins: LLVM asset failed verification" >&2; exit 1; }
+    pin kernel_llvm_sha256 "$sum"
+    kata_tag="$(basename "$(dirname "{{ kernel_kata_url }}")")"
+    sum="$(attested "{{ kernel_kata_url }}" gh release verify-asset "$kata_tag" --repo kata-containers/kata-containers)" \
+        || { echo "refresh-pins: Kata asset failed verification" >&2; exit 1; }
+    pin kernel_kata_sha256 "$sum"
 
 # Boots a real VM: the binary MUST be codesigned with the vz entitlement (see `build`).
 # `release-kernel` overrides localversion with the tag's flavor.rev so uname -r equals the

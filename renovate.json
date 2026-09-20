@@ -4,7 +4,7 @@
     "The canonical Renovate configuration is a shared preset — default.json in the limen repository — so every repository inherits it by reference and a fix there reaches all of them without a file being re-seeded. The ref is pinned: the `renovate` rule keeps it at the repository's own limen version (the farcloser/limen pin in aqua.yaml), so the preset moves with the release like every other canonical file. limen itself, the preset's author, reads it from its own default branch. Everything below is the project's own — overrides and additions go here, next to the ref.",
     "forkProcessing: Renovate skips forked repositories by default under an all-repositories App installation, and it skips them before reading any config beyond this file — so the setting cannot live in the shared preset, and cannot live in a renovate.json5 either: only the onboarding config file name, renovate.json, is read through the platform API at that point. Every repository that is a GitHub fork is silently never processed without it.",
     "gitIgnoredAuthors: the update-aqua-checksum workflow pushes a fix-up commit onto Renovate's branches; without this, Renovate treats the branch as human-modified and stops rebasing it. The org's App identity is the org's, so the array stays here (the `renovate` rule maintains it) rather than in the preset.",
-    "customManagers: the kernel source pin in the Justfile (kernel_source_url, a cdn.kernel.org tarball). Renovate proposes the version bump from the tags of gregkh/linux on GitHub — the linux-stable mirror, which carries the point releases; torvalds/linux carries mainline only (v7.2, -rc) — since kernel.org publishes no feed Renovate reads. kernel_source_sha256 must be updated by hand in the same pull request, from kernel.org's signed sha256sums.asc; the build refuses a mismatch, loudly. The human step is the point: a kernel bump is a reviewed supply-chain change, exactly like ossein's guest kernel pin."
+    "customManagers: the download pins in the Justfile. Renovate bumps the version in each URL; the sha256 next to it does not follow, because no datasource serves one. `just refresh-pins` recomputes every sha256 from its authoritative source (kernel.org's signed sha256sums.asc, the GitHub artifact attestation of the LLVM and Kata assets) and rewrites the Justfile; run it on the Renovate branch and push. The build refuses a mismatch, loudly. Kernel versions come from the tags of gregkh/linux on GitHub — the linux-stable mirror, which carries the point releases; torvalds/linux carries mainline only (v7.2, -rc) — since kernel.org publishes no feed Renovate reads. The Debian build image is a docker digest pin: Renovate moves the digest itself, and kernel_apt_snapshot stays a hand pin (a snapshot.debian.org timestamp has no datasource)."
   ],
   "extends": [
     "github>farcloser/limen#v0.4.0"
@@ -27,6 +27,44 @@
       ],
       "extractVersionTemplate": "^v(?<version>[0-9]+\\.[0-9]+(?:\\.[0-9]+)?)$",
       "versioningTemplate": "semver-coerced"
+    },
+    {
+      "customType": "regex",
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "llvm/llvm-project",
+      "managerFilePatterns": [
+        "/^Justfile$/"
+      ],
+      "matchStrings": [
+        "kernel_llvm_url := \"https://github\\.com/llvm/llvm-project/releases/download/llvmorg-(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)/LLVM-[0-9]+\\.[0-9]+\\.[0-9]+-Linux-ARM64\\.tar\\.xz\""
+      ],
+      "autoReplaceStringTemplate": "kernel_llvm_url := \"https://github.com/llvm/llvm-project/releases/download/llvmorg-{{{newValue}}}/LLVM-{{{newValue}}}-Linux-ARM64.tar.xz\"",
+      "extractVersionTemplate": "^llvmorg-(?<version>[0-9]+\\.[0-9]+\\.[0-9]+)$",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kata-containers/kata-containers",
+      "managerFilePatterns": [
+        "/^Justfile$/"
+      ],
+      "matchStrings": [
+        "kernel_kata_url := \"https://github\\.com/kata-containers/kata-containers/releases/download/(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)/kata-static-[0-9]+\\.[0-9]+\\.[0-9]+-arm64\\.tar\\.zst\""
+      ],
+      "autoReplaceStringTemplate": "kernel_kata_url := \"https://github.com/kata-containers/kata-containers/releases/download/{{{newValue}}}/kata-static-{{{newValue}}}-arm64.tar.zst\"",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "mirror.gcr.io/library/debian",
+      "managerFilePatterns": [
+        "/^Justfile$/"
+      ],
+      "matchStrings": [
+        "kernel_build_image := \"mirror\\.gcr\\.io/library/debian:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""
+      ]
     }
   ]
 }

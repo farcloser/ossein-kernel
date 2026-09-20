@@ -2,6 +2,8 @@ github.com/Code-Hex/go-infinity-channel v1.0.0 h1:M8BWlfDOxq9or9yvF9+YkceoTkDI1p
 github.com/Code-Hex/go-infinity-channel v1.0.0/go.mod h1:5yUVg/Fqao9dAjcpzoQ33WwfdMWmISOrQloDRn3bsvY=
 github.com/Code-Hex/vz/v3 v3.7.1 h1:EN1yNiyrbPq+dl388nne2NySo8I94EnPppvqypA65XM=
 github.com/Code-Hex/vz/v3 v3.7.1/go.mod h1:1LsW0jqW0r0cQ+IeR4hHbjdqOtSidNCVMWhStMHGho8=
+github.com/ProtonMail/go-crypto v1.4.1 h1:9RfcZHqEQUvP8RzecWEUafnZVtEvrBVL9BiF67IQOfM=
+github.com/ProtonMail/go-crypto v1.4.1/go.mod h1:e1OaTyu5SYVrO9gKOEhTc+5UcXtTUa+P3uLudwcgPqo=
 github.com/alecthomas/assert/v2 v2.11.0 h1:2Q9r3ki8+JYXvGsDyBXwH3LcJ+WK5D0gc5E8vS6K3D0=
 github.com/alecthomas/assert/v2 v2.11.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=
 github.com/alecthomas/kong v1.16.1 h1:ixhCt93XkJ98kGposQ54+bl0IK6XwqB40AsMynU7Z8E=
@@ -10,6 +12,8 @@ github.com/alecthomas/repr v0.5.2 h1:SU73FTI9D1P5UNtvseffFSGmdNci/O6RsqzeXJtP0Qs
 github.com/alecthomas/repr v0.5.2/go.mod h1:Fr0507jx4eOXV7AlPV6AVZLYrLIuIeSOWtW57eE/O/4=
 github.com/anchore/go-lzo v0.1.0 h1:NgAacnzqPeGH49Ky19QKLBZEuFRqtTG9cdaucc3Vncs=
 github.com/anchore/go-lzo v0.1.0/go.mod h1:3kLx0bve2oN1iDwgM1U5zGku1Tfbdb0No5qp1eL1fIk=
+github.com/cloudflare/circl v1.6.3 h1:9GPOhQGF9MCYUeXyMYlqTR6a5gTrgR/fBLXvUgtVcg8=
+github.com/cloudflare/circl v1.6.3/go.mod h1:2eXP6Qfat4O/Yhh8BznvKnJ+uzEoTQ6jVKJRn81BiS4=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/diskfs/go-diskfs v1.9.4 h1:0j2d7eG4IjyxL6+ChWbDPocdBCF6HQ4HBWU2WDYWVnc=

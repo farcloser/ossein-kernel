@@ -4,6 +4,7 @@ go 1.26.5
 
 require (
 	github.com/Code-Hex/vz/v3 v3.7.1
+	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/alecthomas/kong v1.16.1
 	github.com/diskfs/go-diskfs v1.9.4
 	github.com/forkcloser/xz v1.0.0
@@ -16,6 +17,7 @@ require (
 
 require (
 	github.com/Code-Hex/go-infinity-channel v1.0.0 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/docker/cli v29.7.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -31,6 +33,7 @@ require (
 	github.com/sirupsen/logrus v1.10.0 // indirect
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/mod v0.40.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect

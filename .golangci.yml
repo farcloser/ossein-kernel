@@ -287,6 +287,8 @@ linters:
             - github.com/mycophonic/primordium
             - github.com/forkcloser/xz
             - github.com/alecthomas/kong
+            # clearsign-verify: kernel.org signs sha256sums.asc with PGP, nothing else here reads PGP
+            - github.com/ProtonMail/go-crypto
             # standalone build environment (replaced ossein): VZ boot, rootfs packer, guest init
             - github.com/Code-Hex/vz/v3
             - github.com/diskfs/go-diskfs
