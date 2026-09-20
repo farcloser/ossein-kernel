@@ -49,22 +49,16 @@ build: build-init
     codesign --force --sign - --timestamp=none --entitlements vz.entitlements build/ossein-kernel
 all: kernel kernel-debug kernel-nopatch
 
-# Pinned guest kernel source (passed explicitly to ossein-kernel).
-kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.6.tar.xz"
-kernel_source_sha256 := "039aef84f2b0994aeda3f4fcfc3d02ec9d7a9bbb9020ea264c43f446c860f606"
+# The kernel source, LLVM toolchain and Kata seed are pinned in pins.yaml and read inside
+# the recipes with `limen pins get` (never at load: a top-level shell() runs on every `just`).
 
 # Build container, pinned on four axes and ALL passed to build.sh: image digest, Debian
 # suite, apt snapshot, clang tarball. kernel_debian_suite MUST match the image's codename.
-# mirror.gcr.io: anonymous, not Hub-rate-limited, digest-preserving. Re-pin with
-# `crane digest debian:trixie-slim` and bump kernel_apt_snapshot.
-kernel_build_image := "mirror.gcr.io/library/debian@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd"
+# mirror.gcr.io: anonymous, not Hub-rate-limited, digest-preserving. The tag is what Renovate
+# tracks; the digest is the pin, and Renovate moves it. Bump kernel_apt_snapshot alongside.
+kernel_build_image := "mirror.gcr.io/library/debian:trixie-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd"
 kernel_debian_suite := "trixie" # apt suite/codename; MUST match the image
 kernel_apt_snapshot := "20260701T025158Z" # snapshot.debian.org archive timestamp
-
-# An exact LLVM release tarball, not apt's clang-NN: apt.llvm.org keeps only the newest
-# build per major, so it pins the major only. Bump URL and sha256 together.
-kernel_llvm_url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-ARM64.tar.xz"
-kernel_llvm_sha256 := "805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34"
 
 # Guest kernel Kconfig allowlist fragment — the "which kernel" input (ossein-kernel merges
 # it onto `make tinyconfig`). Point this at another fragment to build a different kernel.
@@ -75,15 +69,8 @@ kernel_config := "kernel/config/kernel-fragment"
 # explicit, reviewable file with its rationale in the header. build.sh applies them with
 # `patch --forward` under `set -e`, so a patch that stops applying FAILS the build on a kernel
 # bump instead of silently disappearing. Both current patches fix upstream bugs that only bite
-# VZ guests (see each patch header); revisit them when bumping kernel_source_url.
+# VZ guests (see each patch header); revisit them when the kernel pin in pins.yaml moves.
 kernel_patches := "kernel/patches"
-
-# Kata bootstrap kernel: the COLD-START seed only — used once, to boot the very first build
-# VM before the factory can self-host on its own output. Pinned by URL + sha256 like every
-# other download (GitHub publishes the asset digest: `gh api …/releases/tags/<v>`). After
-# the first successful build, --out exists and this is never fetched again.
-kernel_kata_url := "https://github.com/kata-containers/kata-containers/releases/download/3.32.0/kata-static-3.32.0-arm64.tar.zst"
-kernel_kata_sha256 := "8736c054d9223974735394f822000823baef509e1c33405ec798240fa9b6e4b5"
 
 # Kernel version tag appended to the release string (→ 7.1.3-ossein in uname -r + boot
 # banner). Pass the BARE tag (no leading dash) — ossein-kernel prepends the "-" (a leading
@@ -102,15 +89,15 @@ kernel localversion=kernel_localversion: build
         --image "{{ kernel_build_image }}" \
         --debian-suite "{{ kernel_debian_suite }}" \
         --apt-snapshot "{{ kernel_apt_snapshot }}" \
-        --llvm-url "{{ kernel_llvm_url }}" \
-        --llvm-sha256 "{{ kernel_llvm_sha256 }}" \
+        --llvm-url "$(limen pins get llvm url)" \
+        --llvm-sha256 "$(limen pins get llvm sha256)" \
         --localversion "{{ localversion }}" \
         --kernel-config "{{ kernel_config }}" \
         --kernel-patches "{{ kernel_patches }}" \
-        --source-url "{{ kernel_source_url }}" \
-        --source-sha256 "{{ kernel_source_sha256 }}" \
-        --kata-url "{{ kernel_kata_url }}" \
-        --kata-sha256 "{{ kernel_kata_sha256 }}"
+        --source-url "$(limen pins get kernel url)" \
+        --source-sha256 "$(limen pins get kernel sha256)" \
+        --kata-url "$(limen pins get kata url)" \
+        --kata-sha256 "$(limen pins get kata sha256)"
     @just kernel-verify-config
 
 # Build the SAME kernel with kernel/patches/ NOT applied → build/kernel-arm64.nopatch.
@@ -129,14 +116,14 @@ kernel-nopatch: build
         --image "{{ kernel_build_image }}" \
         --debian-suite "{{ kernel_debian_suite }}" \
         --apt-snapshot "{{ kernel_apt_snapshot }}" \
-        --llvm-url "{{ kernel_llvm_url }}" \
-        --llvm-sha256 "{{ kernel_llvm_sha256 }}" \
+        --llvm-url "$(limen pins get llvm url)" \
+        --llvm-sha256 "$(limen pins get llvm sha256)" \
         --localversion "{{ kernel_localversion }}-nopatch" \
         --kernel-config "{{ kernel_config }}" \
-        --source-url "{{ kernel_source_url }}" \
-        --source-sha256 "{{ kernel_source_sha256 }}" \
-        --kata-url "{{ kernel_kata_url }}" \
-        --kata-sha256 "{{ kernel_kata_sha256 }}"
+        --source-url "$(limen pins get kernel url)" \
+        --source-sha256 "$(limen pins get kernel sha256)" \
+        --kata-url "$(limen pins get kata url)" \
+        --kata-sha256 "$(limen pins get kata sha256)"
 
 # Build the ship kernel + in-guest observability -> build/kernel-arm64.debug. NOT shipped:
 # use it to investigate, then throw it away. merge_config takes both fragments in order, so
@@ -153,13 +140,13 @@ kernel-debug: build
         --image "{{ kernel_build_image }}" \
         --debian-suite "{{ kernel_debian_suite }}" \
         --apt-snapshot "{{ kernel_apt_snapshot }}" \
-        --llvm-url "{{ kernel_llvm_url }}" \
-        --llvm-sha256 "{{ kernel_llvm_sha256 }}" \
+        --llvm-url "$(limen pins get llvm url)" \
+        --llvm-sha256 "$(limen pins get llvm sha256)" \
         --localversion "{{ kernel_localversion }}-debug" \
-        --source-url "{{ kernel_source_url }}" \
-        --source-sha256 "{{ kernel_source_sha256 }}" \
-        --kata-url "{{ kernel_kata_url }}" \
-        --kata-sha256 "{{ kernel_kata_sha256 }}"
+        --source-url "$(limen pins get kernel url)" \
+        --source-sha256 "$(limen pins get kernel sha256)" \
+        --kata-url "$(limen pins get kata url)" \
+        --kata-sha256 "$(limen pins get kata sha256)"
 
 # Assert the SHIPPED kernel carries our intended config: extract the embedded IKCONFIG
 # and fail on drift (merge_config + olddefconfig silently revert EXPERT-gated or
@@ -213,7 +200,7 @@ release-kernel tag:
     #!/usr/bin/env bash
     set -euo pipefail
     tag="{{ tag }}"
-    upstream="$(basename "{{ kernel_source_url }}" | sed -E 's/^linux-(.+)\.tar\..*$/\1/')"
+    upstream="$(basename "$(limen pins get kernel url)" | sed -E 's/^linux-(.+)\.tar\..*$/\1/')"
 
     # --- pre-flight (cheap; fail before the long build and before any tag/push) ---
     # Tag is X.Y.Z-<localversion>.rev and X.Y.Z equals the pinned upstream source version:
@@ -223,7 +210,7 @@ release-kernel tag:
         exit 2
     fi
     if [ "$(printf '%s' "$tag" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/')" != "$upstream" ]; then
-        echo "tag version != pinned kernel source $upstream — bump kernel_source_url or fix the tag" >&2
+        echo "tag version != pinned kernel source $upstream — move the kernel pin in pins.yaml or fix the tag" >&2
         exit 2
     fi
     # The kernel's baked-in localversion IS the tag minus the upstream version, so uname -r
@@ -272,10 +259,10 @@ release-kernel tag:
         echo '```'
         echo
         echo "## Build inputs"
-        echo "- kernel source: {{ kernel_source_url }}"
-        echo "  - sha256: {{ kernel_source_sha256 }}"
-        echo "- LLVM toolchain: {{ kernel_llvm_url }}"
-        echo "  - sha256: {{ kernel_llvm_sha256 }}"
+        echo "- kernel source: $(limen pins get kernel url)"
+        echo "  - sha256: $(limen pins get kernel sha256)"
+        echo "- LLVM toolchain: $(limen pins get llvm url)"
+        echo "  - sha256: $(limen pins get llvm sha256)"
         echo "- build image: {{ kernel_build_image }}"
         echo "- debian suite: {{ kernel_debian_suite }}"
         echo "- apt snapshot: {{ kernel_apt_snapshot }}"
