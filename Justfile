@@ -57,8 +57,8 @@ all: kernel kernel-debug kernel-nopatch
 # for this tarball in the series directory's sha256sums.asc, which kernel.org clearsigns
 # with its autosigner key: refresh-pins verifies that signature against the vendored key,
 # pinned here by fingerprint, before trusting a line of it.
-kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz"
-kernel_source_sha256 := "22a0196b3cbcdf34dc27b77561f4d040585fd3447edc9ab3531a1ac79e3041e7"
+kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.6.tar.xz"
+kernel_source_sha256 := "039aef84f2b0994aeda3f4fcfc3d02ec9d7a9bbb9020ea264c43f446c860f606"
 kernel_autosigner_key := "kernel/keys/autosigner.asc"
 kernel_autosigner_fingerprint := "B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1"
 
