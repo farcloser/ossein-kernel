@@ -1,3 +1,0 @@
-# A patch file carries its context lines verbatim: space-before-tab is the unified
-# diff format, not dangling whitespace. Scoped here; the root .gitattributes is canonical.
-*.patch -whitespace
