@@ -22,8 +22,8 @@ pins:
     url: https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/LLVM-${version}-Linux-ARM64.tar.xz
     verify: github-attestation llvm
     digest:
-      version: 22.1.8
-      sha256: 805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34
+      version: 23.1.1
+      sha256: 3fbaaa6a1f147557a4095b9911f8dc2d4c745a11863982f76ee20e248c190a80
   # Kata's bootstrap kernel: the cold-start seed for the very first build VM, never fetched
   # again once the factory self-hosts. GitHub attests the asset as an immutable release.
   - name: kata
