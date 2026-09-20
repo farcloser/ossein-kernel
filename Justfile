@@ -50,8 +50,8 @@ build: build-init
 all: kernel kernel-debug kernel-nopatch
 
 # Pinned guest kernel source (passed explicitly to ossein-kernel).
-kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.xz"
-kernel_source_sha256 := "22a0196b3cbcdf34dc27b77561f4d040585fd3447edc9ab3531a1ac79e3041e7"
+kernel_source_url := "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.6.tar.xz"
+kernel_source_sha256 := "039aef84f2b0994aeda3f4fcfc3d02ec9d7a9bbb9020ea264c43f446c860f606"
 
 # Build container, pinned on four axes and ALL passed to build.sh: image digest, Debian
 # suite, apt snapshot, clang tarball. kernel_debian_suite MUST match the image's codename.
