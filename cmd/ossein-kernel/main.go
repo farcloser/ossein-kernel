@@ -212,14 +212,10 @@ func run(cfg config) error {
 		return err
 	}
 
-	if err := fetchFile(
-		ctx,
-		client,
-		cfg.SourceURL,
-		filepath.Join(workdir, "source.tar.xz"),
-		cfg.SourceSHA,
-		"kernel source",
-	); err != nil {
+	// The guest learns the tarball's name through build.env: the cache keys it by digest.
+	source := sourceTarball(workdir, cfg)
+
+	if err := fetchFile(ctx, client, cfg.SourceURL, source, cfg.SourceSHA, "kernel source"); err != nil {
 		return err
 	}
 	// Toolchain: downloaded, extracted, and trimmed ON THE HOST, then mounted read-only
@@ -303,6 +299,7 @@ func stageWorkdir(cfg config, workdir string) error {
 		"LOCALVERSION=-" + strings.TrimLeft(cfg.LocalVer, "-"),
 		"OSSEIN_DEBIAN_SUITE=" + cfg.DebianSuite,
 		"OSSEIN_APT_SNAPSHOT=" + cfg.AptSnapshot,
+		"OSSEIN_SOURCE_TARBALL=" + filepath.Base(sourceTarball(workdir, cfg)),
 	}, "\n") + "\n"
 
 	if err := filesystem.WriteFile(
@@ -523,6 +520,30 @@ func newDownloadClient() *http.Client {
 	})
 }
 
+// sourceTarball is the kernel source's cache path under workdir. Named once, here, because
+// two places must agree on it: the download and the build.env line that tells the guest.
+func sourceTarball(workdir string, cfg config) string {
+	return cachePath(filepath.Join(workdir, "source.tar.xz"), cfg.SourceSHA)
+}
+
+// cacheKeyLen is how much of the sha256 names a cached download.
+const cacheKeyLen = 12
+
+// cachePath keys a cached download by the digest it must match, so that a pin bump reads
+// as a miss rather than as a cached file that failed its checksum: `source.tar.xz` for
+// digest 039aef84f2b0… is `source-039aef84f2b0.tar.xz`. The warning fetchFile logs on a
+// mismatch is then reserved for a file that changed under the same pin. No digest, no key.
+func cachePath(base, wantSHA string) string {
+	if len(wantSHA) < cacheKeyLen {
+		return base
+	}
+
+	dir, name := filepath.Split(base)
+	stem, ext, _ := strings.Cut(name, ".")
+
+	return filepath.Join(dir, stem+"-"+wantSHA[:cacheKeyLen]+"."+ext)
+}
+
 func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, label string) error {
 	if fi, err := os.Stat(dest); err == nil && fi.Size() > 0 {
 		if wantSHA == "" {
@@ -693,7 +714,7 @@ func prepareLLVM(ctx context.Context, client *http.Client, cfg config) (string, 
 		return llvmDir, nil
 	}
 
-	tarball := filepath.Join(scratchDir, "llvm.tar.xz")
+	tarball := cachePath(filepath.Join(scratchDir, "llvm.tar.xz"), cfg.LLVMSHA)
 	if err := fetchFile(ctx, client, cfg.LLVMURL, tarball, cfg.LLVMSHA, "LLVM toolchain"); err != nil {
 		return "", err
 	}
@@ -898,7 +919,7 @@ func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA stri
 		return cache, nil
 	}
 
-	tarball := filepath.Join(scratchDir, "seed-kernel.tar.zst")
+	tarball := cachePath(filepath.Join(scratchDir, "seed-kernel.tar.zst"), wantSHA)
 	if err := fetchFile(ctx, client, url, tarball, wantSHA, "Seed kernel"); err != nil {
 		return "", err
 	}
