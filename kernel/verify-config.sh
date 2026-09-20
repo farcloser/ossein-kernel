@@ -15,18 +15,10 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"     # repo root (script lives in kernel/)
 
-# Extract the gzipped IKCONFIG blob that follows the IKCFG_ST marker. The stock
-# scripts/extract-ikconfig relies on GNU `tr` and fails on macOS ("Illegal byte
-# sequence"), so we decompress directly with python's zlib.
+# Extract the embedded IKCONFIG with the pinned build's own tool (cmd/ikconfig): the stock
+# scripts/extract-ikconfig relies on GNU `tr` and fails on macOS.
 extract() {  # <kernel-image> -> .config on stdout
-  python3 - "$1" <<'PY'
-import zlib, sys
-data = open(sys.argv[1], 'rb').read()
-i = data.find(b'IKCFG_ST')
-if i < 0:
-    sys.stderr.write("no IKCFG_ST marker (CONFIG_IKCONFIG not set?)\n"); sys.exit(2)
-sys.stdout.write(zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(data[i+8:]).decode('utf-8', 'replace'))
-PY
+  "$HERE/build/ikconfig" "$1"
 }
 
 # golden_filter normalizes an extracted .config down to the golden set: every decided

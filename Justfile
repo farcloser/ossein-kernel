@@ -151,7 +151,7 @@ kernel-debug: build
 # Assert the SHIPPED kernel carries our intended config: extract the embedded IKCONFIG
 # and fail on drift (merge_config + olddefconfig silently revert EXPERT-gated or
 # arch-unreachable fragment lines).
-kernel-verify-config kernel="build/kernel-arm64":
+kernel-verify-config kernel="build/kernel-arm64": build
     bash kernel/verify-config.sh {{ kernel }}
 
 # Regenerate kernel/config/kernel-golden — the committed snapshot of every DECIDED symbol that
@@ -161,7 +161,7 @@ kernel-verify-config kernel="build/kernel-arm64":
 # Delegates to verify-config.sh --golden — extraction AND normalization live there, so this
 # snapshot and the drift diff can never normalize differently. Written via temp + rename so a
 # failed extraction cannot truncate the committed golden.
-kernel-golden kernel="build/kernel-arm64":
+kernel-golden kernel="build/kernel-arm64": build
     #!/usr/bin/env bash
     set -euo pipefail
     tmp="$(mktemp kernel/config/.kernel-golden.XXXXXX)"; trap 'rm -f "$tmp"' EXIT
