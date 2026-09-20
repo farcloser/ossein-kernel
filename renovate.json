@@ -22,7 +22,7 @@
     "customManagers: the kernel source pin in the Justfile (kernel_source_url, a cdn.kernel.org tarball). Renovate proposes the version bump from the tags of gregkh/linux on GitHub — the linux-stable mirror, which carries the point releases; torvalds/linux carries mainline only (v7.2, -rc) — since kernel.org publishes no feed Renovate reads. kernel_source_sha256 must be updated by hand in the same pull request, from kernel.org's signed sha256sums.asc; the build refuses a mismatch, loudly. The human step is the point: a kernel bump is a reviewed supply-chain change, exactly like ossein's guest kernel pin."
   ],
   "extends": [
-    "github>farcloser/limen#v0.4.0"
+    "github>farcloser/limen#v0.5.0"
   ],
   "forkProcessing": "enabled",
   "gitIgnoredAuthors": [
