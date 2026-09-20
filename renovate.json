@@ -20,7 +20,7 @@
     "customManagers: the Debian build image in the Justfile, a docker digest pin Renovate moves itself; the tag is what it tracks, the digest is the pin. The kernel source, LLVM and Kata pins live in pins.yaml, which the shared preset watches and the checksum workflow refreshes. kernel_apt_snapshot stays a hand pin: a snapshot.debian.org timestamp has no datasource."
   ],
   "extends": [
-    "github>farcloser/limen#v0.5.1"
+    "github>farcloser/limen#v0.5.2"
   ],
   "forkProcessing": "enabled",
   "gitIgnoredAuthors": [
