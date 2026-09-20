@@ -11,9 +11,10 @@
 # (kernel/config/kernel-fragment). verify-config.sh guards the boot contract.
 #
 # Inputs — env: OSSEIN_DEBIAN_SUITE (REQUIRED, apt codename, must match the image),
-# OSSEIN_APT_SNAPSHOT (REQUIRED, snapshot.debian.org timestamp), LOCALVERSION (REQUIRED,
-# kernel version suffix, e.g. -ossein).
-# Mounts from ossein-kernel: /kernel (source.tar.xz, build.sh, the fragment — vmlinux +
+# OSSEIN_APT_SNAPSHOT (REQUIRED, snapshot.debian.org timestamp), OSSEIN_SOURCE_TARBALL
+# (REQUIRED, the kernel source tarball's file name under /kernel; the host keys it by
+# digest), LOCALVERSION (REQUIRED, kernel version suffix, e.g. -ossein).
+# Mounts from ossein-kernel: /kernel (the source tarball, build.sh, the fragment — vmlinux +
 # perf out), /opt/llvm (the host-extracted, trimmed clang toolchain, read-only).
 
 set -euo pipefail
@@ -21,6 +22,7 @@ set -euo pipefail
 LOCALVERSION="${LOCALVERSION:?required: kernel version suffix}"
 SUITE="${OSSEIN_DEBIAN_SUITE:?required (e.g. trixie) — must match the base image codename}"
 SNAPSHOT="${OSSEIN_APT_SNAPSHOT:?required — snapshot.debian.org archive timestamp, e.g. 20260701T025158Z}"
+SOURCE_TARBALL="${OSSEIN_SOURCE_TARBALL:?required — the kernel source tarball file name under /kernel}"
 
 case "$(uname -m)" in
   aarch64|arm64) ;;
@@ -40,7 +42,7 @@ PERF_OUTPUT_NAME=perf-arm64
 #   kmod (depmod)      — module install; MODULES=n
 #   cpio               — initramfs; BLK_DEV_INITRD off
 #   wget/ca-certs      — nothing is fetched in-container (tarballs staged in host-side)
-# Kept: bc/bison/flex/make (kconfig + build), xz-utils (extract source.tar.xz), python3
+# Kept: bc/bison/flex/make (kconfig + build), xz-utils (extract the source tarball), python3
 # (a few build sub-steps shell to it), libc6-dev (glibc headers: HOSTCC/clang compiles the
 # kernel's own host tools — fixdep, kconfig, modpost — against <sys/types.h> etc.; the slim
 # base ships none, and it must be named explicitly under --no-install-recommends, which
@@ -106,7 +108,7 @@ export KBUILD_BUILD_USER=ossein
 export KBUILD_BUILD_HOST=ossein
 
 mkdir -p /kbuild
-tar -xf /kernel/source.tar.xz -C /kbuild --strip-components=1
+tar -xf "/kernel/${SOURCE_TARBALL}" -C /kbuild --strip-components=1
 
 (
   cd /kbuild
