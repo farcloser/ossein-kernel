@@ -129,7 +129,7 @@ kernel-nopatch: build
 # use it to investigate, then throw it away. merge_config takes both fragments in order, so
 # the debug one only ADDS (see kernel/config/kernel-debug-fragment for what and why).
 #   OSSEIN_KERNEL=ossein-kernel/build/kernel-arm64.debug ossein run --cpus 4 ...  (+ schedstats=enable)
-# Skips verify-config: the golden describes the SHIP kernel, and this one deliberately differs.
+# Skips kernel-verify-config: the golden describes the SHIP kernel, and this one deliberately differs.
 kernel-debug: build
     bash kernel/merge-fragments.sh {{ kernel_config }} kernel/config/kernel-debug-fragment > build/kernel-debug.merged
     build/ossein-kernel \
@@ -152,20 +152,20 @@ kernel-debug: build
 # and fail on drift (merge_config + olddefconfig silently revert EXPERT-gated or
 # arch-unreachable fragment lines).
 kernel-verify-config kernel="build/kernel-arm64": build
-    bash kernel/verify-config.sh {{ kernel }}
+    build/ikconfig verify "{{ kernel }}" --golden kernel/config/kernel-golden
 
 # Regenerate kernel/config/kernel-golden — the committed snapshot of every DECIDED symbol that
-# verify-config diffs against to catch silent default-y drift, e.g. a new feature
+# `ikconfig verify` diffs against to catch silent default-y drift, e.g. a new feature
 # riding in on a kernel-version bump. Run ONLY when you intentionally change the config, then
 # review + commit the diff (that diff IS the record of what the change turned on/off).
-# Delegates to verify-config.sh --golden — extraction AND normalization live there, so this
-# snapshot and the drift diff can never normalize differently. Written via temp + rename so a
+# `ikconfig golden` and `ikconfig verify` share one extraction and normalization (cmd/ikconfig),
+# so this snapshot and the drift diff can never normalize differently. Written via temp + rename so a
 # failed extraction cannot truncate the committed golden.
 kernel-golden kernel="build/kernel-arm64": build
     #!/usr/bin/env bash
     set -euo pipefail
     tmp="$(mktemp kernel/config/.kernel-golden.XXXXXX)"; trap 'rm -f "$tmp"' EXIT
-    bash kernel/verify-config.sh --golden "{{ kernel }}" > "$tmp"
+    build/ikconfig golden "{{ kernel }}" > "$tmp"
     [ -s "$tmp" ] || { echo "ERROR: empty golden — no IKCONFIG in {{ kernel }}?" >&2; exit 1; }
     mv "$tmp" kernel/config/kernel-golden
     trap - EXIT

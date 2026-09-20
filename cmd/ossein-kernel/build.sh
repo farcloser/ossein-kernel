@@ -8,7 +8,7 @@
 #
 # CONFIG: allowlist model (Apple's approach). `make tinyconfig` (empty base, everything
 # off) + one fragment turning ON only what a VZ virtio microVM + containers need
-# (kernel/config/kernel-fragment). verify-config.sh guards the boot contract.
+# (kernel/config/kernel-fragment). `ikconfig verify` guards the boot contract.
 #
 # Inputs — env: OSSEIN_DEBIAN_SUITE (REQUIRED, apt codename, must match the image),
 # OSSEIN_APT_SNAPSHOT (REQUIRED, snapshot.debian.org timestamp), OSSEIN_SOURCE_TARBALL
