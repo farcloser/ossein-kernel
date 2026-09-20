@@ -7,7 +7,7 @@ go 1.26.5
 
 tool (
 	github.com/farcloser/godolint/cmd/godolint
-	github.com/goccy/go-graphviz/cmd/dot
+	github.com/forkcloser/dot/cmd/dot
 	github.com/google/go-licenses/v2
 	github.com/vbatts/git-validation
 	golang.org/x/tools/cmd/deadcode
@@ -22,16 +22,15 @@ require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/flopp/go-findfont v0.1.0 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
+	github.com/forkcloser/dot v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
-	github.com/goccy/go-graphviz v0.2.5 // indirect
-	github.com/goccy/go-graphviz/cmd/dot v0.0.0-20251129032125-76e04975df88 // indirect
+	github.com/goccy/go-graphviz v0.2.10 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/go-licenses/v2 v2.0.1 // indirect
 	github.com/google/licenseclassifier/v2 v2.0.0 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jessevdk/go-flags v1.6.1 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -44,17 +43,16 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/tetratelabs/wazero v1.10.1 // indirect
+	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/urfave/cli/v3 v3.9.0 // indirect
 	github.com/vbatts/git-validation v1.2.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/image v0.41.0 // indirect
+	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
-	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
 	golang.org/x/vuln v1.8.0 // indirect
