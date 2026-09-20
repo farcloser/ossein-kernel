@@ -585,6 +585,9 @@ CONFIG_INIT_STACK_NONE=y
 # is selectable; under gcc it reverts to LTO_NONE). Do NOT enable CFI_CLANG
 # (indirect-call checks = added cost). NOTE: measured NO syscall win vs gcc (within
 # noise) — KEPT deliberately (harmless, newer compiler + cross-TU inlining defensible),
-# not as a measured earner.
+# not as a measured earner. Full LTO (LTO_CLANG_FULL) was tried on 7.2.6 (2026-09-19, 24 GiB
+# build VM, A/B on ossein's bench-perf-focus): every row within its own run-to-run spread
+# of ThinLTO, image 22% larger (11.1 MB vs 9.1 MB). Not adopted; do not re-run it without
+# a new reason.
 # CONFIG_LTO_NONE is not set
 CONFIG_LTO_CLANG_THIN=y
