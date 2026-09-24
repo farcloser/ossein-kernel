@@ -7,12 +7,12 @@ pins:
   - name: kernel
     renovate: github-tags gregkh/linux
     extract-version: ^v(?<version>[0-9]+\.[0-9]+(?:\.[0-9]+)?)$
-    version: 7.2.6
+    version: 7.2.7
     url: https://cdn.kernel.org/pub/linux/kernel/v${major}.x/linux-${version}.tar.xz
     verify: pgp-sha256sums https://cdn.kernel.org/pub/linux/kernel/v${major}.x/sha256sums.asc https://git.kernel.org/pub/scm/docs/kernel/pgpkeys.git/plain/keys/632D3A06589DA6B1.asc B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1
     digest:
-      version: 7.2.6
-      sha256: 039aef84f2b0994aeda3f4fcfc3d02ec9d7a9bbb9020ea264c43f446c860f606
+      version: 7.2.7
+      sha256: 4ac34c47db2540ffb2713943f8d891ff1702e0ba6934525a493b7d1cad43145a
   # An exact LLVM release tarball, not apt's clang-NN, which keeps only the newest build per
   # major. LLVM's own release workflow attests the asset (SLSA provenance).
   - name: llvm
