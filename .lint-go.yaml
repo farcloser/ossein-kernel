@@ -1,0 +1,71 @@
+# This project's carve-outs from the Go lint baseline (.limen/lint-go.yaml):
+# the baseline's sections, in its shape, holding only what this project adds,
+# changes or takes out. `just do lint go` renders the two on every run
+# (book/per-language.md, "one baseline, per-project carve-outs").
+golangci:
+  linters:
+    exclusions:
+      rules:
+        # gosec on the test helpers: they run commands and open files on
+        # computed paths, which is what a test harness does.
+        - path: testutil/
+          linters:
+            - gosec
+        # Tests are black-box consumers: the rules about API hygiene and
+        # production robustness do not apply to them, the rules about
+        # correctness do.
+        - path: _test\.go
+          linters:
+            - varnamelen # table-driven tests name things tt, tc, wg
+            - dupl # test cases are meant to look alike
+            - dupword # test data
+            - wrapcheck # a test does not wrap what it asserts on
+            - gosec # file and command handling on test fixtures
+            - err113 # dynamic errors are fine in fixtures
+            - dogsled # multiple-return helpers are exercised for one value at a time
+            - noctx # no cancellation to propagate
+            - perfsprint # readability over allocations
+            - depguard # test-only dependencies
+            - gocognit # a table-driven test is one long, flat function by design
+            - gocyclo # same
+            - funlen # same
+            - mnd # fixture values
+            - goconst # fixture values
+    settings:
+      wrapcheck:
+        # Errors from the module's own packages, and from the sibling
+        # primordium, are folded into sentinels and given context at their
+        # source; re-wrapping them in every caller is noise.
+        ignore-package-globs:
+          - github.com/farcloser/ossein-kernel/*
+          - github.com/mycophonic/primordium/*
+      depguard:
+        rules:
+          main:
+            allow:
+              - github.com/mycophonic/primordium
+              - github.com/forkcloser/xz
+              - github.com/alecthomas/kong
+              # Standalone build environment: VZ boot, rootfs packer, guest init.
+              - github.com/Code-Hex/vz/v3
+              - github.com/diskfs/go-diskfs
+              - github.com/google/go-containerregistry
+              - github.com/insomniacslk/dhcp
+              - github.com/vishvananda/netlink
+              - golang.org/x/sys
+      forbidigo:
+        forbid:
+          - pattern: '^os\.UserHomeDir$'
+            msg: "use dirs.HomeDir instead"
+      gomoddirectives:
+        # primordium is an unpublished sibling module consumed via a local replace.
+        replace-local: true
+        replace-allow-list:
+          - github.com/mycophonic/primordium
+  formatters:
+    settings:
+      gci:
+        sections:
+          # Placed before the module's own group: the sibling mycophonic
+          # modules (primordium) keep a group of their own, as they have here.
+          - prefix(github.com/mycophonic)
