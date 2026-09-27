@@ -629,7 +629,7 @@ func downloadAttempt(ctx context.Context, client *http.Client, url, tmp, label s
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return 0, fmt.Errorf("build request for %s: %w", label, err)
 	}
