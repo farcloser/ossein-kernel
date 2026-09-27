@@ -228,19 +228,25 @@ func run(cfg config) error {
 
 	slog.Info("clean build (allowlist)", "config", cfg.KernelConfig)
 
-	if err := buildKernel(ctx, bootstrap, rootImage, workdir, llvmDir); err != nil {
+	err = buildKernel(ctx, bootstrap, rootImage, workdir, llvmDir)
+	if err != nil {
 		return fmt.Errorf("kernel build: %w", err)
 	}
 
+	return promote(ctx, cfg, workdir, rootImage)
+}
+
+// promote takes the two artifacts the guest was asked to produce and installs them
+// next to cfg.Out. The kernel is boot-tested BEFORE it is copied: a kernel that
+// cannot boot + run userland never becomes the self-host default, so a bad build
+// cannot wedge the factory — --out keeps the last kernel that worked.
+// (Container-contract validation lives in ossein's own test suite.)
+func promote(ctx context.Context, cfg config, workdir, rootImage string) error {
 	built := filepath.Join(workdir, "kernel-arm64")
 	if _, err := os.Stat(built); err != nil {
 		return fmt.Errorf("%w (looked in %s)", errNoVmlinux, workdir)
 	}
 
-	// Boot-test the fresh kernel BEFORE promoting it to --out: a kernel that can't boot +
-	// run userland never becomes the self-host default, so a bad build can't wedge the
-	// factory — --out keeps the last kernel that worked. (Container-contract validation now
-	// lives in ossein's own test suite.)
 	if err := smokeTest(ctx, built, rootImage); err != nil {
 		return fmt.Errorf("built kernel failed its boot smoke-test — NOT promoted to %s: %w", cfg.Out, err)
 	}
@@ -249,7 +255,7 @@ func run(cfg config) error {
 		return err
 	}
 
-	slog.Info("kernel built + boot-verified", "path", cfg.Out)
+	slog.InfoContext(ctx, "kernel built + boot-verified", "path", cfg.Out)
 
 	// perf rides out next to the kernel for the cross-runtime `perf bench` harness. build.sh
 	// builds it as a hard step, so a successful build always leaves it here — its absence is a bug.
@@ -263,7 +269,7 @@ func run(cfg config) error {
 		return err
 	}
 
-	slog.Info("perf built + promoted", "path", perfOut)
+	slog.InfoContext(ctx, "perf built + promoted", "path", perfOut)
 
 	return nil
 }
@@ -545,33 +551,38 @@ func cachePath(base, wantSHA string) string {
 	return filepath.Join(dir, stem+"-"+wantSHA[:cacheKeyLen]+"."+ext)
 }
 
-func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, label string) error {
-	if fi, err := os.Stat(dest); err == nil && fi.Size() > 0 {
-		if wantSHA == "" {
-			slog.InfoContext(ctx, "reusing cached artifact", "artifact", label, "path", dest)
-
-			return nil
-		}
-
-		slog.InfoContext(ctx, "verifying cached checksum", "artifact", label)
-
-		if err := verifySHA(dest, wantSHA); err == nil {
-			slog.InfoContext(ctx, "reusing verified artifact", "artifact", label, "path", dest)
-
-			return nil
-		}
-
-		slog.WarnContext(ctx, "cached artifact failed checksum; re-downloading", "artifact", label)
+// cachedArtifactOK reports whether dest can stand in for a fresh download: a non-empty
+// file matching wantSHA, or any non-empty file when nothing is pinned. A cached file
+// that fails its pin is unusable, and the caller re-downloads it.
+func cachedArtifactOK(ctx context.Context, dest, wantSHA, label string) bool {
+	fi, err := os.Stat(dest)
+	if err != nil || fi.Size() == 0 {
+		return false
 	}
 
-	// Ensure the destination dir exists — fetchFile is order-independent (the seed download
-	// runs before run()'s workdir MkdirAll, and build/ may have just been removed).
-	if err := os.MkdirAll(filepath.Dir(dest), filesystem.DirPermissionsPrivate); err != nil {
-		return fmt.Errorf("create dest dir for %s: %w", label, err)
+	if wantSHA == "" {
+		slog.InfoContext(ctx, "reusing cached artifact", "artifact", label, "path", dest)
+
+		return true
 	}
 
-	tmp := dest + partialSuffix
+	slog.InfoContext(ctx, "verifying cached checksum", "artifact", label)
 
+	if err := verifySHA(dest, wantSHA); err == nil {
+		slog.InfoContext(ctx, "reusing verified artifact", "artifact", label, "path", dest)
+
+		return true
+	}
+
+	slog.WarnContext(ctx, "cached artifact failed checksum; re-downloading", "artifact", label)
+
+	return false
+}
+
+// downloadWithRetries re-GETs into tmp when a body copy fails, the failure the client's
+// own request-scoped retry does not cover (see the layering note on downloadAttempts).
+// A cancelled parent context is terminal: a Ctrl-C does not burn the remaining attempts.
+func downloadWithRetries(ctx context.Context, client *http.Client, url, tmp, label string) (int64, error) {
 	var (
 		written int64
 		err     error
@@ -584,22 +595,43 @@ func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, lab
 
 			select {
 			case <-ctx.Done():
-				return fmt.Errorf("download %s interrupted: %w", label, ctx.Err())
+				return 0, fmt.Errorf("download %s interrupted: %w", label, ctx.Err())
 			case <-time.After(downloadRetryWait):
 			}
 		}
 
 		slog.InfoContext(ctx, "downloading", "artifact", label, "url", url)
 
-		if written, err = downloadAttempt(ctx, client, url, tmp, label); err == nil {
-			break
+		written, err = downloadAttempt(ctx, client, url, tmp, label)
+		if err == nil {
+			return written, nil
 		}
-		// A user Ctrl-C (parent ctx cancelled) is terminal — don't burn retries on it.
+
 		if ctx.Err() != nil {
-			return fmt.Errorf("download %s interrupted: %w", label, ctx.Err())
+			return 0, fmt.Errorf("download %s interrupted: %w", label, ctx.Err())
 		}
 	}
 
+	return 0, err
+}
+
+// fetchFile downloads url to dest unless a usable copy is already cached there, checks it
+// against wantSHA, and only then renames it into place: a killed run leaves a .part, never
+// a truncated file at the path the cache check trusts.
+func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, label string) error {
+	if cachedArtifactOK(ctx, dest, wantSHA, label) {
+		return nil
+	}
+
+	// Ensure the destination dir exists — fetchFile is order-independent (the seed download
+	// runs before run()'s workdir MkdirAll, and build/ may have just been removed).
+	if err := os.MkdirAll(filepath.Dir(dest), filesystem.DirPermissionsPrivate); err != nil {
+		return fmt.Errorf("create dest dir for %s: %w", label, err)
+	}
+
+	tmp := dest + partialSuffix
+
+	written, err := downloadWithRetries(ctx, client, url, tmp, label)
 	if err != nil {
 		return err
 	}
@@ -781,22 +813,13 @@ func extractLLVM(tarball, destDir string) error {
 			return fmt.Errorf("read llvm tar: %w", err)
 		}
 
-		// Strip the leading LLVM-<ver>-… path component.
-		rel := strings.TrimPrefix(hdr.Name, "./")
-
-		slash := strings.IndexByte(rel, '/')
-		if slash < 0 {
-			continue // the top-level directory entry itself
+		target, wanted, err := llvmEntryTarget(hdr.Name, destDir, root)
+		if err != nil {
+			return err
 		}
 
-		rel = rel[slash+1:]
-		if rel == "" || pruneLLVMPath(rel) {
+		if !wanted {
 			continue
-		}
-
-		target := filepath.Join(destDir, rel)
-		if !strings.HasPrefix(target, root) {
-			return fmt.Errorf("%w: %s", errTarEscape, hdr.Name)
 		}
 
 		if err := writeLLVMEntry(root, target, hdr, tarReader); err != nil {
@@ -807,10 +830,36 @@ func extractLLVM(tarball, destDir string) error {
 	return nil
 }
 
+// llvmEntryTarget maps one tar entry name to where it is extracted, stripping the
+// archive's leading LLVM-<ver>-… component. wanted is false for the entries that are
+// not extracted at all: the top-level directory itself and everything pruneLLVMPath
+// drops. root is destDir with a trailing separator, so the prefix test cannot pass on
+// a sibling directory whose name merely starts with destDir.
+func llvmEntryTarget(name, destDir, root string) (string, bool, error) {
+	rel := strings.TrimPrefix(name, "./")
+
+	slash := strings.IndexByte(rel, '/')
+	if slash < 0 {
+		return "", false, nil
+	}
+
+	rel = rel[slash+1:]
+	if rel == "" || pruneLLVMPath(rel) {
+		return "", false, nil
+	}
+
+	target := filepath.Join(destDir, rel)
+	if !strings.HasPrefix(target, root) {
+		return "", false, fmt.Errorf("%w: %s", errTarEscape, name)
+	}
+
+	return target, true, nil
+}
+
 // writeLLVMEntry materializes one tar entry (directory, regular file, or symlink)
-// at target. Split out of extractLLVM so that loop stays within the cognitive-complexity
-// budget; the caller has already validated that target is inside the destination root
-// (root, trailing-separator terminated, is passed through only to validate symlink targets).
+// at target. The caller has already validated that target is inside the destination
+// root (root, trailing-separator terminated, is passed through only to validate
+// symlink targets).
 func writeLLVMEntry(root, target string, hdr *tar.Header, tarReader *tar.Reader) error {
 	switch hdr.Typeflag {
 	case tar.TypeDir:
@@ -818,55 +867,71 @@ func writeLLVMEntry(root, target string, hdr *tar.Header, tarReader *tar.Reader)
 			return fmt.Errorf("mkdir %s: %w", target, err)
 		}
 	case tar.TypeReg:
-		if err := os.MkdirAll(filepath.Dir(target), filesystem.DirPermissionsPrivate); err != nil {
-			return fmt.Errorf("mkdir parent of %s: %w", target, err)
-		}
-		// Preserve the archive's mode bits (.Perm()) — clang/ld.lld need their exec bit.
-		mode := os.FileMode(hdr.Mode).Perm() // #nosec G115 -- a tar file mode always fits uint32
-
-		out, err := os.OpenFile(target, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode) // #nosec G304 -- path validated
-		if err != nil {
-			return fmt.Errorf("create %s: %w", target, err)
-		}
-
-		if _, err := io.Copy(out, tarReader); err != nil {
-			_ = out.Close()
-
-			return fmt.Errorf("write %s: %w", target, err)
-		}
-
-		if err := out.Close(); err != nil {
-			return fmt.Errorf("close %s: %w", target, err)
-		}
+		return writeLLVMFile(target, hdr, tarReader)
 	case tar.TypeSymlink:
-		// Reject a link whose target escapes the destination root — an absolute target, or one
-		// that climbs out via `..`. The archive is sha256-pinned so this is hardening, not a live
-		// threat, but the lexical target check above is blind to symlinks: an in-root symlinked
-		// dir that a later entry writes through would defeat it, and an escaping link is the way
-		// to create one. Resolve the target relative to the link's own directory before checking.
-		linkTarget := hdr.Linkname
-		if !filepath.IsAbs(linkTarget) {
-			// #nosec G305 -- joined only to validate the target; escapes are rejected below
-			linkTarget = filepath.Join(filepath.Dir(target), linkTarget)
-		}
-
-		if !strings.HasPrefix(filepath.Clean(linkTarget)+string(os.PathSeparator), root) {
-			return fmt.Errorf("%w: symlink %s -> %s", errTarEscape, hdr.Name, hdr.Linkname)
-		}
-
-		if err := os.MkdirAll(filepath.Dir(target), filesystem.DirPermissionsPrivate); err != nil {
-			return fmt.Errorf("mkdir parent of %s: %w", target, err)
-		}
-
-		_ = os.Remove(target) // idempotent re-extract
-		if err := os.Symlink(hdr.Linkname, target); err != nil {
-			return fmt.Errorf("symlink %s: %w", target, err)
-		}
+		return writeLLVMSymlink(root, target, hdr)
 	default:
 		// hardlinks/devices/etc — none expected in the LLVM bundle. Log rather than drop
 		// silently, so a future bundle that ships one surfaces here instead of as a baffling
 		// "clang: not found" later in the build.
 		slog.Warn("skipping unsupported llvm tar entry", "name", hdr.Name, "type", hdr.Typeflag)
+	}
+
+	return nil
+}
+
+// writeLLVMFile extracts one regular entry, preserving the archive's mode bits
+// (.Perm()) — clang and ld.lld need their exec bit.
+func writeLLVMFile(target string, hdr *tar.Header, tarReader *tar.Reader) error {
+	if err := os.MkdirAll(filepath.Dir(target), filesystem.DirPermissionsPrivate); err != nil {
+		return fmt.Errorf("mkdir parent of %s: %w", target, err)
+	}
+
+	mode := os.FileMode(hdr.Mode).Perm() // #nosec G115 -- a tar file mode always fits uint32
+
+	out, err := os.OpenFile(target, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode) // #nosec G304 -- path validated
+	if err != nil {
+		return fmt.Errorf("create %s: %w", target, err)
+	}
+
+	if _, err := io.Copy(out, tarReader); err != nil {
+		_ = out.Close()
+
+		return fmt.Errorf("write %s: %w", target, err)
+	}
+
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", target, err)
+	}
+
+	return nil
+}
+
+// writeLLVMSymlink rejects a link whose target escapes the destination root — an
+// absolute target, or one that climbs out via `..`. The archive is sha256-pinned so
+// this is hardening, not a live threat, but the caller's lexical target check is blind
+// to symlinks: an in-root symlinked dir that a later entry writes through would defeat
+// it, and an escaping link is the way to create one. The target is resolved relative to
+// the link's own directory before it is checked.
+func writeLLVMSymlink(root, target string, hdr *tar.Header) error {
+	linkTarget := hdr.Linkname
+	if !filepath.IsAbs(linkTarget) {
+		// #nosec G305 -- joined only to validate the target; escapes are rejected below
+		linkTarget = filepath.Join(filepath.Dir(target), linkTarget)
+	}
+
+	if !strings.HasPrefix(filepath.Clean(linkTarget)+string(os.PathSeparator), root) {
+		return fmt.Errorf("%w: symlink %s -> %s", errTarEscape, hdr.Name, hdr.Linkname)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(target), filesystem.DirPermissionsPrivate); err != nil {
+		return fmt.Errorf("mkdir parent of %s: %w", target, err)
+	}
+
+	_ = os.Remove(target) // idempotent re-extract
+
+	if err := os.Symlink(hdr.Linkname, target); err != nil {
+		return fmt.Errorf("symlink %s: %w", target, err)
 	}
 
 	return nil
@@ -926,16 +991,29 @@ func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA stri
 		return "", err
 	}
 
+	if err := extractSeedKernel(tarball, cache); err != nil {
+		return "", fmt.Errorf("seed kernel from %s: %w", url, err)
+	}
+
+	slog.InfoContext(ctx, "bootstrap: extracted seed kernel", "path", cache)
+
+	return cache, nil
+}
+
+// extractSeedKernel writes the tarball's uncompressed vmlinux to cache. TypeReg excludes
+// the vmlinux.container symlink, and "vmlinuz" cannot match the "vmlinux" prefix, so no
+// explicit exclusion is needed for either.
+func extractSeedKernel(tarball, cache string) error {
 	tarFile, err := os.Open(tarball) // #nosec G304 -- tarball is a fixed scratchDir path
 	if err != nil {
-		return "", fmt.Errorf("open seed tarball %s: %w", tarball, err)
+		return fmt.Errorf("open seed tarball %s: %w", tarball, err)
 	}
 	defer func() { _ = tarFile.Close() }()
 
 	// Pure-Go decompression via primordium (magic-byte detection → zstd here).
 	decompressor, err := compress.Decompress(tarFile)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer func() { _ = decompressor.Close() }()
 
@@ -947,46 +1025,47 @@ func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA stri
 		}
 
 		if err != nil {
-			return "", fmt.Errorf("read seed tar: %w", err)
+			return fmt.Errorf("read seed tar: %w", err)
 		}
-		// The uncompressed vmlinux — a real file (TypeReg excludes the vmlinux.container
-		// symlink; "vmlinuz" can't match the "vmlinux" prefix, so no explicit exclusion).
-		base := path.Base(hdr.Name)
-		if hdr.Typeflag == tar.TypeReg && strings.HasPrefix(base, "vmlinux") {
-			if err := os.MkdirAll(filepath.Dir(cache), filesystem.DirPermissionsPrivate); err != nil {
-				return "", fmt.Errorf("create seed cache dir: %w", err)
-			}
-			// Extract to a temp path then rename — an interrupted cold-start extract must
-			// not leave a truncated kernel that the Size()>0 reuse check (above) accepts
-			// forever, wedging every future cold start at VM boot.
-			partial := cache + partialSuffix
 
-			out, err := os.Create(partial) // #nosec G304 -- partial is a fixed scratchDir path
-			if err != nil {
-				return "", fmt.Errorf("create seed file %s: %w", partial, err)
-			}
-
-			if _, err := io.Copy(out, tarReader); err != nil { // #nosec G110 -- sha-verified pinned release
-				_ = out.Close()
-
-				return "", fmt.Errorf("write seed kernel: %w", err)
-			}
-
-			if err := out.Close(); err != nil {
-				return "", fmt.Errorf("close seed file %s: %w", partial, err)
-			}
-
-			if err := os.Rename(partial, cache); err != nil {
-				return "", fmt.Errorf("rename seed kernel into place: %w", err)
-			}
-
-			slog.InfoContext(ctx, "bootstrap: extracted seed kernel", "path", cache)
-
-			return cache, nil
+		if hdr.Typeflag == tar.TypeReg && strings.HasPrefix(path.Base(hdr.Name), "vmlinux") {
+			return writeSeedKernel(cache, tarReader)
 		}
 	}
 
-	return "", fmt.Errorf("%w: %s", errNoSeedVmlinux, url)
+	return errNoSeedVmlinux
+}
+
+// writeSeedKernel extracts to a temp path and renames: an interrupted cold-start extract
+// must not leave a truncated kernel that fetchSeedKernel's Size()>0 reuse check accepts
+// forever, wedging every future cold start at VM boot.
+func writeSeedKernel(cache string, tarReader *tar.Reader) error {
+	if err := os.MkdirAll(filepath.Dir(cache), filesystem.DirPermissionsPrivate); err != nil {
+		return fmt.Errorf("create seed cache dir: %w", err)
+	}
+
+	partial := cache + partialSuffix
+
+	out, err := os.Create(partial) // #nosec G304 -- partial is a fixed scratchDir path
+	if err != nil {
+		return fmt.Errorf("create seed file %s: %w", partial, err)
+	}
+
+	if _, err := io.Copy(out, tarReader); err != nil { // #nosec G110 -- sha-verified pinned release
+		_ = out.Close()
+
+		return fmt.Errorf("write seed kernel: %w", err)
+	}
+
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("close seed file %s: %w", partial, err)
+	}
+
+	if err := os.Rename(partial, cache); err != nil {
+		return fmt.Errorf("rename seed kernel into place: %w", err)
+	}
+
+	return nil
 }
 
 func copyWithProgress(dst io.Writer, src io.Reader, total int64, label string) (int64, error) {
@@ -999,27 +1078,6 @@ func copyWithProgress(dst io.Writer, src io.Reader, total int64, label string) (
 	start := time.Now()
 	lastLog, lastBytes := start, int64(0)
 
-	logLine := func(deltaBytes int64, since time.Duration) {
-		mbps := 0.0
-		if s := since.Seconds(); s > 0 {
-			mbps = float64(deltaBytes) / s / (1 << 20)
-		}
-
-		switch {
-		case total > 0 && mbps > 0:
-			etaSecs := float64(total-written) / (mbps * (1 << 20))
-			eta := time.Duration(etaSecs * float64(time.Second)).Round(time.Second)
-			slog.Info("downloading", "artifact", label, "mb", written>>20, "of", total>>20,
-				"pct", written*100/total, "rate", fmt.Sprintf("%.1f MB/s", mbps), "eta", eta)
-		case total > 0:
-			slog.Info("downloading", "artifact", label, "mb", written>>20, "of", total>>20,
-				"pct", written*100/total)
-		default:
-			slog.Info("downloading", "artifact", label, "mb", written>>20,
-				"rate", fmt.Sprintf("%.1f MB/s", mbps))
-		}
-	}
-
 	for {
 		nread, rerr := src.Read(buf)
 		if nread > 0 {
@@ -1029,13 +1087,14 @@ func copyWithProgress(dst io.Writer, src io.Reader, total int64, label string) (
 
 			written += int64(nread)
 			if now := time.Now(); now.Sub(lastLog) >= tick {
-				logLine(written-lastBytes, now.Sub(lastLog))
+				logProgress(label, written, total, written-lastBytes, now.Sub(lastLog))
 				lastLog, lastBytes = now, written
 			}
 		}
 
 		if rerr == io.EOF {
-			logLine(written, time.Since(start)) // final line: average over the whole transfer
+			// final line: average over the whole transfer
+			logProgress(label, written, total, written, time.Since(start))
 
 			return written, nil
 		}
@@ -1043,6 +1102,29 @@ func copyWithProgress(dst io.Writer, src io.Reader, total int64, label string) (
 		if rerr != nil {
 			return written, fmt.Errorf("read download: %w", rerr)
 		}
+	}
+}
+
+// logProgress reports one download-progress line: how much has arrived, and — when the
+// rate over deltaBytes/since allows it — the share of total done and the time left.
+func logProgress(label string, written, total, deltaBytes int64, since time.Duration) {
+	mbps := 0.0
+	if s := since.Seconds(); s > 0 {
+		mbps = float64(deltaBytes) / s / (1 << 20)
+	}
+
+	switch {
+	case total > 0 && mbps > 0:
+		etaSecs := float64(total-written) / (mbps * (1 << 20))
+		eta := time.Duration(etaSecs * float64(time.Second)).Round(time.Second)
+		slog.Info("downloading", "artifact", label, "mb", written>>20, "of", total>>20,
+			"pct", written*100/total, "rate", fmt.Sprintf("%.1f MB/s", mbps), "eta", eta)
+	case total > 0:
+		slog.Info("downloading", "artifact", label, "mb", written>>20, "of", total>>20,
+			"pct", written*100/total)
+	default:
+		slog.Info("downloading", "artifact", label, "mb", written>>20,
+			"rate", fmt.Sprintf("%.1f MB/s", mbps))
 	}
 }
 
