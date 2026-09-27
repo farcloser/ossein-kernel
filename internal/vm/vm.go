@@ -31,6 +31,13 @@ var (
 	errRunError    = errors.New("vm entered error state")
 )
 
+// bytesPerMiB converts Config.MemoryMiB into the byte count VZ wants.
+const bytesPerMiB = 1024 * 1024
+
+// startTimeout bounds the wait for the guest to report running: VZ either
+// reaches that state in well under a second or never will.
+const startTimeout = 30 * time.Second
+
 // Share is a virtio-fs directory share, mounted in-guest by tag.
 type Share struct {
 	Tag      string
@@ -84,7 +91,7 @@ func New(cfg Config) (*VM, error) {
 		return nil, fmt.Errorf("bootloader: %w", err)
 	}
 
-	vmc, err := vz.NewVirtualMachineConfiguration(boot, cfg.CPUs, cfg.MemoryMiB*1024*1024)
+	vmc, err := vz.NewVirtualMachineConfiguration(boot, cfg.CPUs, cfg.MemoryMiB*bytesPerMiB)
 	if err != nil {
 		return nil, fmt.Errorf("vm configuration: %w", err)
 	}
@@ -235,7 +242,7 @@ func (m *VM) Start() error {
 		return fmt.Errorf("start: %w", err)
 	}
 
-	deadline := time.After(30 * time.Second)
+	deadline := time.After(startTimeout)
 
 	for {
 		select {
