@@ -69,7 +69,7 @@ type Config struct {
 // goldenLine is a decided symbol: =y, =m, or a numeric, hex or string value.
 // Numerics and strings count, not only bools: arm64 defaults NR_CPUS=512, which
 // force-selects CPUMASK_OFFSTACK, and a =y-only golden would never see it move.
-var goldenLine = regexp.MustCompile(`^CONFIG_[A-Z0-9_]+=(y|m|[0-9]+|0x[0-9a-fA-F]+|".*")$`)
+var goldenLine = regexp.MustCompile(`^CONFIG_[A-Z0-9_]+=(y|m|\d+|0x[0-9a-fA-F]+|".*")$`)
 
 // Parse reads a .config into states and the golden set.
 func Parse(config []byte) Config {
