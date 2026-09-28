@@ -208,14 +208,14 @@ func run(cfg config) error {
 	// (/kbuild) is NOT virtio-fs: the guest init mounts it as tmpfs (a real fs the guest
 	// kernel owns), so size the VM's memory to fit the build.
 	workdir := filepath.Join(scratchDir, "kernel")
-	if err := stageWorkdir(cfg, workdir); err != nil {
+	if err = stageWorkdir(cfg, workdir); err != nil {
 		return err
 	}
 
 	// The guest learns the tarball's name through build.env: the cache keys it by digest.
 	source := sourceTarball(workdir, cfg)
 
-	if err := fetchFile(ctx, client, cfg.SourceURL, source, cfg.SourceSHA, "kernel source"); err != nil {
+	if err = fetchFile(ctx, client, cfg.SourceURL, source, cfg.SourceSHA, "kernel source"); err != nil {
 		return err
 	}
 	// Toolchain: downloaded, extracted, and trimmed ON THE HOST, then mounted read-only
