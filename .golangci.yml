@@ -267,6 +267,10 @@ linters:
         - name: line-length-limit
           # Formatter `golines` takes care of this.
           disabled: true
+        - name: redundant-import-alias
+          # Formatter `goimports` writes an explicit alias on an import path
+          # whose last element is a version (pkg/v1); this rule would reject it.
+          disabled: true
         - name: unhandled-error
           arguments:
             - "fmt.Print"
