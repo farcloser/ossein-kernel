@@ -345,7 +345,7 @@ func buildKernel(ctx context.Context, bootstrap, rootImage, workdir, llvmDir str
 		return err
 	}
 
-	slog.InfoContext(ctx, "booting build VM", "cpus", cpus, "memMiB", buildVMMemoryMiB)
+	slog.InfoContext(ctx, "booting build VM", "cpus", cpus, "mem_mib", buildVMMemoryMiB)
 
 	code, err := boot(ctx, machine, workdir)
 	if err != nil {
