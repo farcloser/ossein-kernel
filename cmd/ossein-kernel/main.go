@@ -345,7 +345,7 @@ func buildKernel(ctx context.Context, bootstrap, rootImage, workdir, llvmDir str
 		return err
 	}
 
-	slog.Info("booting build VM", "cpus", cpus, "memMiB", buildVMMemoryMiB)
+	slog.InfoContext(ctx, "booting build VM", "cpus", cpus, "memMiB", buildVMMemoryMiB)
 
 	code, err := boot(ctx, machine, workdir)
 	if err != nil {
@@ -361,7 +361,7 @@ func buildKernel(ctx context.Context, bootstrap, rootImage, workdir, llvmDir str
 }
 
 func smokeTest(ctx context.Context, kernelPath, rootImage string) error {
-	slog.Info("boot smoke-test: booting the freshly-built kernel", "kernel", kernelPath)
+	slog.InfoContext(ctx, "boot smoke-test: booting the freshly-built kernel", "kernel", kernelPath)
 
 	// A throwaway /kernel share whose build.sh just proves userland runs. No network.
 	smokeDir := filepath.Join(scratchDir, "smoke")
@@ -402,7 +402,7 @@ func smokeTest(ctx context.Context, kernelPath, rootImage string) error {
 		return fmt.Errorf("%w: exit code %d", errSmokeExit, code)
 	}
 
-	slog.Info("boot smoke-test: passed (kernel boots + userland runs)")
+	slog.InfoContext(ctx, "boot smoke-test: passed (kernel boots + userland runs)")
 
 	return nil
 }
@@ -457,7 +457,7 @@ func prepareRootfs(ctx context.Context, cfg config) (string, error) {
 	// #nosec G304 -- stamp is a fixed scratchDir path
 	if prev, err := os.ReadFile(stamp); err == nil && strings.TrimSpace(string(prev)) == key {
 		if fi, err := os.Stat(rootImage); err == nil && fi.Size() > 0 {
-			slog.Info("reusing Debian root disk", "path", rootImage, "image", cfg.Image)
+			slog.InfoContext(ctx, "reusing Debian root disk", "path", rootImage, "image", cfg.Image)
 
 			return rootImage, nil
 		}
@@ -467,7 +467,7 @@ func prepareRootfs(ctx context.Context, cfg config) (string, error) {
 		return "", fmt.Errorf("create scratch dir: %w", err)
 	}
 
-	slog.Info("building Debian root disk from image", "image", cfg.Image)
+	slog.InfoContext(ctx, "building Debian root disk from image", "image", cfg.Image)
 
 	// Build to a temp path then rename — the same atomicity contract as fetchFile and
 	// fetchSeedKernel: an uncleanly-killed build (SIGKILL, power loss) must not leave a
@@ -486,7 +486,7 @@ func prepareRootfs(ctx context.Context, cfg config) (string, error) {
 		return "", err
 	}
 
-	slog.Info("Debian root disk ready", "path", rootImage)
+	slog.InfoContext(ctx, "Debian root disk ready", "path", rootImage)
 
 	return rootImage, nil
 }
@@ -547,20 +547,20 @@ func cachePath(base, wantSHA string) string {
 func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, label string) error {
 	if fi, err := os.Stat(dest); err == nil && fi.Size() > 0 {
 		if wantSHA == "" {
-			slog.Info("reusing cached artifact", "artifact", label, "path", dest)
+			slog.InfoContext(ctx, "reusing cached artifact", "artifact", label, "path", dest)
 
 			return nil
 		}
 
-		slog.Info("verifying cached checksum", "artifact", label)
+		slog.InfoContext(ctx, "verifying cached checksum", "artifact", label)
 
 		if err := verifySHA(dest, wantSHA); err == nil {
-			slog.Info("reusing verified artifact", "artifact", label, "path", dest)
+			slog.InfoContext(ctx, "reusing verified artifact", "artifact", label, "path", dest)
 
 			return nil
 		}
 
-		slog.Warn("cached artifact failed checksum; re-downloading", "artifact", label)
+		slog.WarnContext(ctx, "cached artifact failed checksum; re-downloading", "artifact", label)
 	}
 
 	// Ensure the destination dir exists — fetchFile is order-independent (the seed download
@@ -578,7 +578,7 @@ func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, lab
 
 	for attempt := 1; attempt <= downloadAttempts; attempt++ {
 		if attempt > 1 {
-			slog.Warn("retrying download", "artifact", label,
+			slog.WarnContext(ctx, "retrying download", "artifact", label,
 				"attempt", attempt, "of", downloadAttempts, "err", err)
 
 			select {
@@ -588,7 +588,7 @@ func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, lab
 			}
 		}
 
-		slog.Info("downloading", "artifact", label, "url", url)
+		slog.InfoContext(ctx, "downloading", "artifact", label, "url", url)
 
 		if written, err = downloadAttempt(ctx, client, url, tmp, label); err == nil {
 			break
@@ -606,13 +606,13 @@ func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, lab
 	if wantSHA != "" {
 		// A full re-read of the file to hash it — for the ~1.8 GB tarball this is a
 		// multi-second pass with no network, so label it or it reads as a post-100% hang.
-		slog.Info("verifying checksum", "artifact", label, "mb", written>>20)
+		slog.InfoContext(ctx, "verifying checksum", "artifact", label, "mb", written>>20)
 
 		if err := verifySHA(tmp, wantSHA); err != nil {
 			return err
 		}
 	} else {
-		slog.Warn("no checksum pin; artifact unverified", "artifact", label, "path", dest)
+		slog.WarnContext(ctx, "no checksum pin; artifact unverified", "artifact", label, "path", dest)
 	}
 
 	if err := os.Rename(tmp, dest); err != nil {
@@ -709,7 +709,7 @@ func prepareLLVM(ctx context.Context, client *http.Client, cfg config) (string, 
 
 	stampSHA, err := os.ReadFile(stamp) // #nosec G304 -- stamp is a fixed scratchDir path
 	if err == nil && strings.TrimSpace(string(stampSHA)) == cfg.LLVMSHA {
-		slog.Info("reusing extracted LLVM toolchain", "path", llvmDir)
+		slog.InfoContext(ctx, "reusing extracted LLVM toolchain", "path", llvmDir)
 
 		return llvmDir, nil
 	}
@@ -719,7 +719,7 @@ func prepareLLVM(ctx context.Context, client *http.Client, cfg config) (string, 
 		return "", err
 	}
 
-	slog.Info("extracting + trimming LLVM toolchain", "dest", llvmDir)
+	slog.InfoContext(ctx, "extracting + trimming LLVM toolchain", "dest", llvmDir)
 
 	if err := os.RemoveAll(llvmDir); err != nil {
 		return "", fmt.Errorf("clear llvm dir: %w", err)
@@ -894,12 +894,13 @@ func resolveBootstrap(ctx context.Context, client *http.Client, cfg config) (str
 	// kernel is ~10 MB) wedging every build at VM boot; fall back to the seed instead.
 	if info, err := os.Stat(cfg.Out); err == nil {
 		if info.Size() >= minKernelBytes {
-			slog.Info("bootstrap: self-hosting", "path", cfg.Out)
+			slog.InfoContext(ctx, "bootstrap: self-hosting", "path", cfg.Out)
 
 			return cfg.Out, nil
 		}
 
-		slog.Warn(
+		slog.WarnContext(
+			ctx,
 			"existing --out is implausibly small; ignoring it and using the seed",
 			"path",
 			cfg.Out,
@@ -914,7 +915,7 @@ func resolveBootstrap(ctx context.Context, client *http.Client, cfg config) (str
 func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA string) (string, error) {
 	cache := filepath.Join(scratchDir, "bootstrap-kernel-arm64")
 	if fi, err := os.Stat(cache); err == nil && fi.Size() > 0 {
-		slog.Info("bootstrap: cached kernel", "path", cache)
+		slog.InfoContext(ctx, "bootstrap: cached kernel", "path", cache)
 
 		return cache, nil
 	}
@@ -978,7 +979,7 @@ func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA stri
 				return "", fmt.Errorf("rename seed kernel into place: %w", err)
 			}
 
-			slog.Info("bootstrap: extracted seed kernel", "path", cache)
+			slog.InfoContext(ctx, "bootstrap: extracted seed kernel", "path", cache)
 
 			return cache, nil
 		}
