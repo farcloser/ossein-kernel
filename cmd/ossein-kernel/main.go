@@ -486,7 +486,7 @@ func prepareRootfs(ctx context.Context, cfg config) (string, error) {
 		return "", err
 	}
 
-	slog.InfoContext(ctx, "Debian root disk ready", "path", rootImage)
+	slog.InfoContext(ctx, "debian root disk ready", "path", rootImage)
 
 	return rootImage, nil
 }
