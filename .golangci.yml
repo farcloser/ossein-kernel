@@ -142,7 +142,6 @@ linters:
 
     # Duplicates
     - cyclop # provided by revive
-    - gocyclo # provided by revive
     - errcheck # provided by revive
     - errname # provided by revive
     - forcetypeassert # provided by revive
@@ -176,12 +175,15 @@ linters:
           - depguard
           - gocognit
           - funlen
+          - gocyclo
       - path: _test.go
         text: "add-constant|confusing-results|nested-structs|use-waitgroup-go|unchecked-type-assertion|unhandled-error|unused-receiver"
         linters:
           - revive
 
   settings:
+    gocyclo:
+      min-complexity: 15
     govet:
       enable-all: true
       disable: [fieldalignment]
@@ -281,7 +283,8 @@ linters:
           # gocognit, as in limen v0.6.1's baseline.
           disabled: true
         - name: cyclomatic
-          arguments: [30]
+          # gocyclo, as in limen v0.6.1's baseline.
+          disabled: true
         - name: max-public-structs
           arguments: [10]
 
