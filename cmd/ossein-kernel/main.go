@@ -608,7 +608,7 @@ func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, lab
 	if wantSHA != "" {
 		// A full re-read of the file to hash it — for the ~1.8 GB tarball this is a
 		// multi-second pass with no network, so label it or it reads as a post-100% hang.
-		slog.InfoContext(ctx, "verifying checksum", "artifact", label, "mb", written>>20)
+		slog.InfoContext(ctx, "verifying checksum", "artifact", label, "mb", written/bytesize.MiB)
 
 		if err := verifySHA(tmp, wantSHA); err != nil {
 			return err
@@ -993,7 +993,7 @@ func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA stri
 func copyWithProgress(dst io.Writer, src io.Reader, total int64, label string) (int64, error) {
 	const tick = 2 * time.Second
 
-	buf := make([]byte, 1<<20)
+	buf := make([]byte, bytesize.MiB)
 
 	var written int64
 
@@ -1003,20 +1003,20 @@ func copyWithProgress(dst io.Writer, src io.Reader, total int64, label string) (
 	logLine := func(deltaBytes int64, since time.Duration) {
 		mbps := 0.0
 		if s := since.Seconds(); s > 0 {
-			mbps = float64(deltaBytes) / s / (1 << 20)
+			mbps = float64(deltaBytes) / s / bytesize.MiB
 		}
 
 		switch {
 		case total > 0 && mbps > 0:
-			etaSecs := float64(total-written) / (mbps * (1 << 20))
+			etaSecs := float64(total-written) / (mbps * bytesize.MiB)
 			eta := time.Duration(etaSecs * float64(time.Second)).Round(time.Second)
-			slog.Info("downloading", "artifact", label, "mb", written>>20, "of", total>>20,
+			slog.Info("downloading", "artifact", label, "mb", written/bytesize.MiB, "of", total/bytesize.MiB,
 				"pct", written*100/total, "rate", fmt.Sprintf("%.1f MB/s", mbps), "eta", eta)
 		case total > 0:
-			slog.Info("downloading", "artifact", label, "mb", written>>20, "of", total>>20,
+			slog.Info("downloading", "artifact", label, "mb", written/bytesize.MiB, "of", total/bytesize.MiB,
 				"pct", written*100/total)
 		default:
-			slog.Info("downloading", "artifact", label, "mb", written>>20,
+			slog.Info("downloading", "artifact", label, "mb", written/bytesize.MiB,
 				"rate", fmt.Sprintf("%.1f MB/s", mbps))
 		}
 	}
