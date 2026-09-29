@@ -147,7 +147,6 @@ linters:
     - errname # provided by revive
     - forcetypeassert # provided by revive
     - funlen # provided by revive
-    - gocognit # provided by revive
     - goconst # provided by revive
     - gomodguard # we use depguard instead
     - lll # provided by golines
@@ -176,12 +175,15 @@ linters:
           - noctx
           - perfsprint
           - depguard
+          - gocognit
       - path: _test.go
-        text: "add-constant|cognitive-complexity|confusing-results|nested-structs|use-waitgroup-go|unchecked-type-assertion|unhandled-error|unused-receiver"
+        text: "add-constant|confusing-results|nested-structs|use-waitgroup-go|unchecked-type-assertion|unhandled-error|unused-receiver"
         linters:
           - revive
 
   settings:
+    gocognit:
+      min-complexity: 15
     gocritic:
       enable-all: true
       disabled-checks: [whyNoLint, paramTypeCombine, octalLiteral, importShadow, builtinShadow, builtinShadowDecl, dupImport, commentFormatting, defaultCaseOrder, tooManyResultsChecker, unnamedResult, nestingReduce, externalErrorReassign, redundantSprint, yodaStyleExpr, exposedSyncMutex, hugeParam, rangeValCopy, ruleguard, todoCommentWithoutDetail, preferFilepathJoin, sloppyReassign]
@@ -265,7 +267,8 @@ linters:
               allowStrs: '"","%w: %q","%w: %w","%w: %s"," ","-","`","\n",":","@",".","%s:%s"'
               ignoreFuncs: 'slog[.].*'
         - name: cognitive-complexity
-          arguments: [30]
+          # gocognit, as in limen v0.6.1's baseline.
+          disabled: true
         - name: cyclomatic
           arguments: [30]
         - name: max-public-structs
