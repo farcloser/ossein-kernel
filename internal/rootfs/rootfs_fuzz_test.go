@@ -12,13 +12,15 @@ import (
 
 	"github.com/diskfs/go-diskfs/backend/file"
 	"github.com/diskfs/go-diskfs/filesystem/ext4"
+
+	"github.com/mycophonic/primordium/bytesize"
 )
 
 // fuzzImageBytes sizes the throwaway ext4 image each FuzzUnpackTar iteration
 // formats: sparse on disk, so the cost is the format, not the bytes. Two block
 // groups at least — go-diskfs needs a backup group for the resize inode and
 // refuses anything smaller.
-const fuzzImageBytes = 256 << 20
+const fuzzImageBytes = 256 * bytesize.MiB
 
 // FuzzDiskPath pins the path mapper to what go-diskfs will accept: never a
 // leading slash, always clean, and stable under a second application.
