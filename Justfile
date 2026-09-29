@@ -7,11 +7,6 @@ import '.limen/just/main.just'
 # darwin/arm64-only; the init is static linux/arm64.
 export CGO_ENABLED := '1'
 
-# go-licenses false-positives our own GPL-2.0 module once first-party code spans
-# sub-packages (internal/vm, internal/rootfs) — see go-licenses#186. Our license is
-# intentional (this builds a Linux kernel); ignore the self-module in the dep scan.
-export LINT_GO_LICENSES_FLAGS := '--ignore=github.com/farcloser/ossein-kernel'
-
 # guest_env is the cross-compile environment for the linux/arm64 PID-1 init, and
 # guest_pkgs the packages it covers. `do lint go` runs golangci once per GOOS, but the
 # CGO_ENABLED=1 above pins it to the NATIVE leg only (loading foreign-GOOS packages needs
@@ -23,9 +18,14 @@ guest_pkgs := "./cmd/ossein-kernel/init/..."
 
 # The FIRST recipe defined here becomes `just`'s default.
 lint: do::lint::default do::lint::go::default do::lint::go::deadcode
-    {{ guest_env }} golangci-lint run {{ guest_pkgs }}
-    # build/tools/govulncheck is built natively by the shared vuln leg this recipe
-    # depends on; run it, not a PATH one.
+    # build/tools/golangci-lint, on the build/golangci.yml it renders, is built
+    # natively by the shared leg this recipe depends on; run it, not a PATH one.
+    {{ guest_env }} build/tools/golangci-lint run -c build/golangci.yml {{ guest_pkgs }}
+
+# The security lane plus the init's half of it: the shared vuln leg scans what
+# builds natively, and the init is linux-only. build/tools/govulncheck is built
+# by that leg.
+security: do::security::default
     {{ guest_env }} build/tools/govulncheck {{ guest_pkgs }}
 
 fix: do::fix::default do::fix::go::default
