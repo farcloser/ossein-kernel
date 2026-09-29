@@ -33,6 +33,7 @@ import (
 	uxz "github.com/forkcloser/xz"
 
 	"github.com/mycophonic/primordium/app/logger"
+	"github.com/mycophonic/primordium/bytesize"
 	"github.com/mycophonic/primordium/compress"
 	"github.com/mycophonic/primordium/filesystem"
 	"github.com/mycophonic/primordium/filesystem/dirs"
@@ -63,9 +64,9 @@ const buildLogFile = "build.log"
 // ~150 MB and apt-installed build deps add a few hundred more; 2 GiB is ample.
 const rootfsSizeBytes = 2 << 30
 
-// smokeTestMemoryMiB sizes the throwaway VM that boot-tests a freshly built kernel;
+// smokeTestMemory sizes the throwaway VM that boot-tests a freshly built kernel;
 // 1 GiB is ample to boot the kernel and run a trivial userland command.
-const smokeTestMemoryMiB = 1024
+const smokeTestMemory = bytesize.GiB
 
 // minKernelBytes is the floor below which an existing --out is treated as truncated
 // garbage rather than a real kernel (a real vmlinux is ~10 MB) and ignored for self-hosting.
@@ -106,12 +107,12 @@ const (
 	downloadMaxBackoff  = 30 * time.Second // ceiling on the client's own request-level backoff
 )
 
-// buildVMMemoryMiB sizes the build VM. Everything writable lives in RAM: the init pivots the
+// buildVMMemory sizes the build VM. Everything writable lives in RAM: the init pivots the
 // read-only ext4 root into a tmpfs overlay (apt installs land there, ~300 MB), and /kbuild is
 // a tmpfs holding the extracted source (~1.5 GB) + objects (~2 GB for the lean allowlist
 // kernel). So memory must fit both. The toolchain is a read-only /opt/llvm virtio-fs mount,
 // not tmpfs. 8 GiB is comfortable and leaves headroom on a 16 GB host; bump if it ever ENOSPCs.
-const buildVMMemoryMiB = 8192
+const buildVMMemory = 8 * bytesize.GiB
 
 type config struct {
 	LogLevel string `default:"info" enum:"debug,info,warn,error" help:"log verbosity" name:"log-level"`
@@ -326,10 +327,10 @@ func buildKernel(ctx context.Context, bootstrap, rootImage, workdir, llvmDir str
 	machine, err := vm.New(vm.Config{
 		Kernel: bootstrap,
 		// Pristine ext4 attached read-only; the init overlays a tmpfs so writes go to RAM.
-		RootDisk:  rootImage,
-		Init:      initGuestPath,
-		CPUs:      uint(cpus),
-		MemoryMiB: buildVMMemoryMiB,
+		RootDisk: rootImage,
+		Init:     initGuestPath,
+		CPUs:     uint(cpus),
+		Memory:   buildVMMemory,
 		// ossein.net=1: build.sh apt-gets from snapshot.debian.org. ossein.llvm=1: declares
 		// the /opt/llvm share so the init hard-requires its mount instead of tolerating a
 		// failure that would resurface minutes later as "clang: not found" mid-build (the
@@ -346,7 +347,7 @@ func buildKernel(ctx context.Context, bootstrap, rootImage, workdir, llvmDir str
 		return err
 	}
 
-	slog.InfoContext(ctx, "booting build VM", "cpus", cpus, "mem_mib", buildVMMemoryMiB)
+	slog.InfoContext(ctx, "booting build VM", "cpus", cpus, "mem_mib", buildVMMemory/bytesize.MiB)
 
 	code, err := boot(ctx, machine, workdir)
 	if err != nil {
@@ -382,13 +383,13 @@ func smokeTest(ctx context.Context, kernelPath, rootImage string) error {
 	}
 
 	machine, err := vm.New(vm.Config{
-		Kernel:    kernelPath,
-		RootDisk:  rootImage, // pristine, read-only; init overlays a tmpfs
-		Init:      initGuestPath,
-		CPUs:      1,
-		MemoryMiB: smokeTestMemoryMiB,
-		Console:   os.Stdout,
-		Shares:    []vm.Share{{Tag: "kernel", Dir: smokeDir}},
+		Kernel:   kernelPath,
+		RootDisk: rootImage, // pristine, read-only; init overlays a tmpfs
+		Init:     initGuestPath,
+		CPUs:     1,
+		Memory:   smokeTestMemory,
+		Console:  os.Stdout,
+		Shares:   []vm.Share{{Tag: "kernel", Dir: smokeDir}},
 	})
 	if err != nil {
 		return err
