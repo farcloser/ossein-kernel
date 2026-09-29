@@ -103,6 +103,7 @@ const (
 	downloadAttempts    = 3                // file-level re-GET attempts on a body-copy failure
 	downloadRetryWait   = 3 * time.Second  // fixed backoff between those attempts
 	downloadIdleTimeout = 60 * time.Second // abort a body that receives no bytes for this long
+	downloadMaxBackoff  = 30 * time.Second // ceiling on the client's own request-level backoff
 )
 
 // buildVMMemoryMiB sizes the build VM. Everything writable lives in RAM: the init pivots the
@@ -515,7 +516,7 @@ func newDownloadClient() *http.Client {
 	return transporter.NewClient(transporter.Options{
 		MaxRetries:     3,
 		InitialBackoff: time.Second,
-		MaxBackoff:     30 * time.Second,
+		MaxBackoff:     downloadMaxBackoff,
 		UserAgent:      "ossein-kernel",
 	})
 }
