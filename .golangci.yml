@@ -182,6 +182,10 @@ linters:
           - revive
 
   settings:
+    nolintlint:
+      allow-unused: false
+      require-explanation: true
+      require-specific: true
     wrapcheck:
       # wrapcheck exists to keep THIRD-PARTY errors traceable. Errors from our
       # own internal packages are already folded into sentinels and given

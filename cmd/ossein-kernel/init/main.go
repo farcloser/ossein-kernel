@@ -379,9 +379,7 @@ func runBuild() (int, error) {
 	// Both guest fds already share the console, so routing stderr via os.Stdout loses nothing.
 	out := io.MultiWriter(os.Stdout, logFile)
 
-	// noctx: PID 1 has no cancellation story — the build runs to completion and the HOST
-	// cancels by stopping the VM. A context.Background() here would be pure ceremony.
-	//nolint:noctx
+	//nolint:noctx // PID 1 runs the build to completion; the host cancels by stopping the VM.
 	cmd := exec.Command("/bin/bash", buildScript)
 	cmd.Env = env
 	cmd.Dir = kernelShare
