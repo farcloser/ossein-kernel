@@ -146,7 +146,6 @@ linters:
     - errcheck # provided by revive
     - errname # provided by revive
     - forcetypeassert # provided by revive
-    - funlen # provided by revive
     - goconst # provided by revive
     - gomodguard # we use depguard instead
     - lll # provided by golines
@@ -176,12 +175,17 @@ linters:
           - perfsprint
           - depguard
           - gocognit
+          - funlen
       - path: _test.go
         text: "add-constant|confusing-results|nested-structs|use-waitgroup-go|unchecked-type-assertion|unhandled-error|unused-receiver"
         linters:
           - revive
 
   settings:
+    funlen:
+      lines: 80
+      statements: 40
+      ignore-comments: true
     gocognit:
       min-complexity: 15
     gocritic:
@@ -259,7 +263,8 @@ linters:
       enable-all-rules: true
       rules:
         - name: function-length
-          arguments: [100, 0]
+          # funlen, as in limen v0.6.1's baseline.
+          disabled: true
         - name: add-constant
           arguments:
             - allowFloats: "0.0,1.0"
