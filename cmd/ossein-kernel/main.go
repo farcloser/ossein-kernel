@@ -229,19 +229,24 @@ func run(cfg config) error {
 
 	slog.Info("clean build (allowlist)", "config", cfg.KernelConfig)
 
-	if err := buildKernel(ctx, bootstrap, rootImage, workdir, llvmDir); err != nil {
+	if err = buildKernel(ctx, bootstrap, rootImage, workdir, llvmDir); err != nil {
 		return fmt.Errorf("kernel build: %w", err)
 	}
 
+	return promote(ctx, cfg, workdir, rootImage)
+}
+
+// promote takes the two artifacts the guest was asked to produce and installs them
+// next to cfg.Out. The kernel is boot-tested BEFORE it is copied: a kernel that
+// cannot boot + run userland never becomes the self-host default, so a bad build
+// cannot wedge the factory — --out keeps the last kernel that worked.
+// (Container-contract validation lives in ossein's own test suite.)
+func promote(ctx context.Context, cfg config, workdir, rootImage string) error {
 	built := filepath.Join(workdir, "kernel-arm64")
 	if _, err := os.Stat(built); err != nil {
 		return fmt.Errorf("%w (looked in %s)", errNoVmlinux, workdir)
 	}
 
-	// Boot-test the fresh kernel BEFORE promoting it to --out: a kernel that can't boot +
-	// run userland never becomes the self-host default, so a bad build can't wedge the
-	// factory — --out keeps the last kernel that worked. (Container-contract validation now
-	// lives in ossein's own test suite.)
 	if err := smokeTest(ctx, built, rootImage); err != nil {
 		return fmt.Errorf("built kernel failed its boot smoke-test — NOT promoted to %s: %w", cfg.Out, err)
 	}
@@ -250,7 +255,7 @@ func run(cfg config) error {
 		return err
 	}
 
-	slog.Info("kernel built + boot-verified", "path", cfg.Out)
+	slog.InfoContext(ctx, "kernel built + boot-verified", "path", cfg.Out)
 
 	// perf rides out next to the kernel for the cross-runtime `perf bench` harness. build.sh
 	// builds it as a hard step, so a successful build always leaves it here — its absence is a bug.
@@ -264,7 +269,7 @@ func run(cfg config) error {
 		return err
 	}
 
-	slog.Info("perf built + promoted", "path", perfOut)
+	slog.InfoContext(ctx, "perf built + promoted", "path", perfOut)
 
 	return nil
 }
