@@ -62,7 +62,7 @@ const buildLogFile = "build.log"
 
 // rootfsSizeBytes is the nominal (sparse) size of the Debian root disk: the base is
 // ~150 MB and apt-installed build deps add a few hundred more; 2 GiB is ample.
-const rootfsSizeBytes = 2 << 30
+const rootfsSizeBytes = 2 * bytesize.GiB
 
 // smokeTestMemory sizes the throwaway VM that boot-tests a freshly built kernel;
 // 1 GiB is ample to boot the kernel and run a trivial userland command.
@@ -70,7 +70,7 @@ const smokeTestMemory = bytesize.GiB
 
 // minKernelBytes is the floor below which an existing --out is treated as truncated
 // garbage rather than a real kernel (a real vmlinux is ~10 MB) and ignored for self-hosting.
-const minKernelBytes = 1 << 20
+const minKernelBytes = bytesize.MiB
 
 // partialSuffix marks an in-progress download/build artifact; every cacheable artifact
 // (downloads, the seed kernel, the root disk) is written under this suffix and renamed
