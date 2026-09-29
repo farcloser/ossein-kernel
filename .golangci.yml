@@ -182,6 +182,9 @@ linters:
           - revive
 
   settings:
+    gocritic:
+      enable-all: true
+      disabled-checks: [whyNoLint, paramTypeCombine, octalLiteral, importShadow, builtinShadow, builtinShadowDecl, dupImport, commentFormatting, defaultCaseOrder, tooManyResultsChecker, unnamedResult, nestingReduce, externalErrorReassign, redundantSprint, yodaStyleExpr, exposedSyncMutex, hugeParam, rangeValCopy, ruleguard, todoCommentWithoutDetail, preferFilepathJoin, sloppyReassign]
     nolintlint:
       allow-unused: false
       require-explanation: true
