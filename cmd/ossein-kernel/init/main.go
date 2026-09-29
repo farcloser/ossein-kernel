@@ -271,7 +271,7 @@ func bringUpNetwork() error {
 		return err
 	}
 
-	if err := netlink.LinkSetUp(link); err != nil {
+	if err = netlink.LinkSetUp(link); err != nil {
 		return fmt.Errorf("link up %s: %w", link.Attrs().Name, err)
 	}
 
