@@ -31,9 +31,6 @@ var (
 	errRunError    = errors.New("vm entered error state")
 )
 
-// bytesPerMiB converts Config.MemoryMiB into the byte count VZ wants.
-const bytesPerMiB = 1024 * 1024
-
 // startTimeout bounds the wait for the guest to report running: VZ either
 // reaches that state in well under a second or never will.
 const startTimeout = 30 * time.Second
@@ -47,15 +44,15 @@ type Share struct {
 
 // Config describes one build microVM.
 type Config struct {
-	Kernel    string // uncompressed arm64 Image (kernel-arm64)
-	RootDisk  string // Debian rootfs ext4 → /dev/vda (attached read-only; the init overlays a tmpfs)
-	Init      string // guest init path for the kernel init= arg (e.g. /ossein-init)
-	CPUs      uint
-	MemoryMiB uint64
-	Cmdline   []string // extra kernel args appended to the boot contract
-	Shares    []Share
-	Network   bool     // attach a VZ NAT NIC (build needs it for apt; smoke test does not)
-	Console   *os.File // guest console (hvc0) sink; nil = discard
+	Kernel   string // uncompressed arm64 Image (kernel-arm64)
+	RootDisk string // Debian rootfs ext4 → /dev/vda (attached read-only; the init overlays a tmpfs)
+	Init     string // guest init path for the kernel init= arg (e.g. /ossein-init)
+	CPUs     uint
+	Memory   uint64   // guest RAM, in bytes
+	Cmdline  []string // extra kernel args appended to the boot contract
+	Shares   []Share
+	Network  bool     // attach a VZ NAT NIC (build needs it for apt; smoke test does not)
+	Console  *os.File // guest console (hvc0) sink; nil = discard
 }
 
 // VM wraps a running/startable vz VirtualMachine.
@@ -91,7 +88,7 @@ func New(cfg Config) (*VM, error) {
 		return nil, fmt.Errorf("bootloader: %w", err)
 	}
 
-	vmc, err := vz.NewVirtualMachineConfiguration(boot, cfg.CPUs, cfg.MemoryMiB*bytesPerMiB)
+	vmc, err := vz.NewVirtualMachineConfiguration(boot, cfg.CPUs, cfg.Memory)
 	if err != nil {
 		return nil, fmt.Errorf("vm configuration: %w", err)
 	}
