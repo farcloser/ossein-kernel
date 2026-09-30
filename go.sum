@@ -53,8 +53,8 @@ github.com/mdlayher/packet v1.1.2 h1:3Up1NG6LZrsgDVn6X4L9Ge/iyRyxFEFD9o6Pr3Q1nQY
 github.com/mdlayher/packet v1.1.2/go.mod h1:GEu1+n9sG5VtiRE4SydOmX5GTwyyYlteZiFU+x0kew4=
 github.com/mdlayher/socket v0.4.1 h1:eM9y2/jlbs1M615oshPQOHZzj6R6wMT7bX5NPiQvn2U=
 github.com/mdlayher/socket v0.4.1/go.mod h1:cAqeGjoufqdxWkD7DkpyS+wcefOtmu5OQ8KuoJGIReA=
-github.com/mycophonic/primordium v0.10.0 h1:Rhx7wJLvbFSxy8IuXYttjWWF2N3Htwrntq81RzQPhXk=
-github.com/mycophonic/primordium v0.10.0/go.mod h1:Y/rNWpirlgvjesW/L6y6cKj/d51udniCzdzeZdtsT2k=
+github.com/mycophonic/primordium v0.10.1 h1:vY27+DvEaT90iauECBphP5xb6ynLQTv+Q+xtZ8bzqZw=
+github.com/mycophonic/primordium v0.10.1/go.mod h1:Y/rNWpirlgvjesW/L6y6cKj/d51udniCzdzeZdtsT2k=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
