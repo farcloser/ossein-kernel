@@ -1,0 +1,46 @@
+# This project's carve-outs from the Go lint baseline (.limen/lint-go.yaml):
+# the baseline's sections, in its shape, holding only what this project adds,
+# changes or takes out. `just do lint go` renders the two on every run
+# (book/per-language.md, "one baseline, per-project carve-outs").
+licenses:
+  # go-licenses reports this module's own GPL-2.0 once first-party code spans
+  # sub-packages (internal/vm, internal/rootfs), go-licenses#186. The license
+  # is intentional: this builds a Linux kernel.
+  ignore:
+    - github.com/farcloser/ossein-kernel
+
+golangci:
+  linters:
+    settings:
+      wrapcheck:
+        # Errors from the module's own packages, and from the sibling
+        # primordium, are folded into sentinels and given context at their
+        # source; re-wrapping them in every caller is noise.
+        ignore-package-globs:
+          - github.com/farcloser/ossein-kernel/*
+          - github.com/mycophonic/primordium/*
+      depguard:
+        rules:
+          main:
+            allow:
+              - github.com/mycophonic/primordium
+              - github.com/forkcloser/xz
+              - github.com/alecthomas/kong
+              # Standalone build environment: VZ boot, rootfs packer, guest init.
+              - github.com/Code-Hex/vz/v3
+              - github.com/diskfs/go-diskfs
+              - github.com/google/go-containerregistry
+              - github.com/insomniacslk/dhcp
+              - github.com/vishvananda/netlink
+              - golang.org/x/sys
+      forbidigo:
+        forbid:
+          - pattern: '^os\.UserHomeDir$'
+            msg: "use dirs.HomeDir instead"
+  formatters:
+    settings:
+      gci:
+        sections:
+          # Placed before the module's own group: the sibling mycophonic
+          # modules (primordium) keep a group of their own, as they have here.
+          - prefix(github.com/mycophonic)
