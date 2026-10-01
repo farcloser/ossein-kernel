@@ -3,7 +3,7 @@ module github.com/farcloser/ossein-kernel
 go 1.26.5
 
 require (
-	github.com/Code-Hex/vz/v3 v3.7.1
+	github.com/Code-Hex/vz/v3 v3.8.0
 	github.com/alecthomas/kong v1.16.1
 	github.com/diskfs/go-diskfs v1.9.4
 	github.com/forkcloser/xz v1.0.0
