@@ -14,13 +14,13 @@ registries:
     ref: v4.570.0 # renovate: depName=aquaproj/aqua-registry
   - name: local
     type: local
-    path: .limen/aqua-registry.yaml
+    path: ../.limen/aqua-registry.yaml
 
 packages:
   # --- go install tools (local registry, GOSUMDB-verified) ---
   # Pseudo-version: the nested cmd/dot module carries no tags upstream.
   # --- farcloser tools (local registry; standard once registered upstream) ---
-  - name: farcloser/limen@v0.6.2 # renovate: depName=farcloser/limen
+  - name: farcloser/limen@v0.7.0 # renovate: depName=farcloser/limen
     registry: local
   # --- toolchain + binary-release tools (standard registry, aqua-verified) ---
   - name: golang/go@go1.27.1
@@ -39,3 +39,4 @@ packages:
     registry: local
   - name: forkcloser/curl@v8.21.0
     registry: local
+  - import: ../.limen/aqua.yaml

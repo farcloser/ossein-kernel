@@ -15,3 +15,7 @@ WIP_*
 
 # Build output and Go artifacts (subprojects keep their own .gitignore too)
 /build
+
+# Required by limen (book/mandatory-files.md, ".gitignore").
+/_scratch
+.claude
