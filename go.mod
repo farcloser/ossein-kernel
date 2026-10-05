@@ -6,10 +6,10 @@ require (
 	github.com/Code-Hex/vz/v3 v3.8.0
 	github.com/alecthomas/kong v1.16.1
 	github.com/diskfs/go-diskfs v1.9.4
-	github.com/forkcloser/xz v1.0.0
+	github.com/forkcloser/xz v1.0.1
 	github.com/google/go-containerregistry v0.22.1
 	github.com/insomniacslk/dhcp v0.0.0-20260901064844-234b97448fae
-	github.com/mycophonic/primordium v0.11.0
+	github.com/mycophonic/primordium v0.11.1
 	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/sys v0.48.0
 )
