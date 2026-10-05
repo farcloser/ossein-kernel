@@ -56,9 +56,9 @@ all: kernel kernel-debug kernel-nopatch
 # suite, apt snapshot, clang tarball. kernel_debian_suite MUST match the image's codename.
 # mirror.gcr.io: anonymous, not Hub-rate-limited, digest-preserving. The tag is what Renovate
 # tracks; the digest is the pin, and Renovate moves it. Bump kernel_apt_snapshot alongside.
-kernel_build_image := "mirror.gcr.io/library/debian:trixie-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd"
+kernel_build_image := "mirror.gcr.io/library/debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a"
 kernel_debian_suite := "trixie" # apt suite/codename; MUST match the image
-kernel_apt_snapshot := "20260701T025158Z" # snapshot.debian.org archive timestamp
+kernel_apt_snapshot := "20261003T204240Z" # snapshot.debian.org archive timestamp
 
 # Guest kernel Kconfig allowlist fragment — the "which kernel" input (ossein-kernel merges
 # it onto `make tinyconfig`). Point this at another fragment to build a different kernel.
