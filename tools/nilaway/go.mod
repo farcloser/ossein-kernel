@@ -2,7 +2,7 @@
 // which a shared tools module could not promise (book/tooling.md).
 module github.com/farcloser/ossein-kernel/tools/nilaway
 
-go 1.26.5
+go 1.26.0
 
 tool go.uber.org/nilaway/cmd/nilaway
 

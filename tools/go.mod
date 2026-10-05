@@ -3,7 +3,7 @@
 // project's go.mod (book/tooling.md).
 module github.com/farcloser/ossein-kernel/tools
 
-go 1.26.5
+go 1.26.0
 
 tool (
 	github.com/farcloser/godolint/cmd/godolint
