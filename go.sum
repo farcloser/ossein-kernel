@@ -22,8 +22,8 @@ github.com/docker/docker-credential-helpers v0.9.8 h1:bIREROb7So6PRlq6KTtdS9MPEj
 github.com/docker/docker-credential-helpers v0.9.8/go.mod h1:v1S+hepowrQXITkEfw6o4+BMbGot02wiKpzWhGUZK6c=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57 h1:x5yxNrq8XffV/OoNUeFPM6hxHVi5OTspSTBxr/9pemg=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57/go.mod h1:GLo/8fDswSAniFG+BFIaiSPcK610jyzgEhWYPQwuQdw=
-github.com/forkcloser/xz v1.0.0 h1:kmiIk1SRI4ffZKNYQ+PgpIZ5WeF/opZKCiRUJyc8/Lw=
-github.com/forkcloser/xz v1.0.0/go.mod h1:97jHfaW5ugdlASYSsIlWK2tohamE+Jh5ouA78TH92sU=
+github.com/forkcloser/xz v1.0.1 h1:Uke5nZlvoOkBpA0rBFvqQxEFywX7glYBPfrXO7HeNH8=
+github.com/forkcloser/xz v1.0.1/go.mod h1:97jHfaW5ugdlASYSsIlWK2tohamE+Jh5ouA78TH92sU=
 github.com/go-test/deep v1.1.1 h1:0r/53hagsehfO4bzD2Pgr/+RgHqhmf+k1Bpse2cTu1U=
 github.com/go-test/deep v1.1.1/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
@@ -53,8 +53,8 @@ github.com/mdlayher/packet v1.1.2 h1:3Up1NG6LZrsgDVn6X4L9Ge/iyRyxFEFD9o6Pr3Q1nQY
 github.com/mdlayher/packet v1.1.2/go.mod h1:GEu1+n9sG5VtiRE4SydOmX5GTwyyYlteZiFU+x0kew4=
 github.com/mdlayher/socket v0.4.1 h1:eM9y2/jlbs1M615oshPQOHZzj6R6wMT7bX5NPiQvn2U=
 github.com/mdlayher/socket v0.4.1/go.mod h1:cAqeGjoufqdxWkD7DkpyS+wcefOtmu5OQ8KuoJGIReA=
-github.com/mycophonic/primordium v0.11.0 h1:wD6mz4UJkwtl44waIwUIiXb+wBJxadZDxuofzKGJ7iw=
-github.com/mycophonic/primordium v0.11.0/go.mod h1:d6B42nJ2icSr3b417YHblDuweH5iM60jqlV1OSPRz3Q=
+github.com/mycophonic/primordium v0.11.1 h1:QZsDEO3DRnFXyuDBSdvKm7S4QPdv1bosRmdVS/Xca0Y=
+github.com/mycophonic/primordium v0.11.1/go.mod h1:hc47mZUgZSBt7YDpDGhxY0QC1+EW6+0wdj6J0bwKYlE=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
