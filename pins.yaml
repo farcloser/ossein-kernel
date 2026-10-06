@@ -15,15 +15,18 @@ pins:
       sha256: b4c5dfbe51a364a6c7f03869200f88c8e1f77403539005f14b7fc6bc91b8d8ba
   # An exact LLVM release tarball, not apt's clang-NN, which keeps only the newest build per
   # major. LLVM's own release workflow attests the asset (SLSA provenance).
+  # Held on 22: every 23.x Linux release links lld against ICU 70, which only Ubuntu 22.04
+  # ships, so ld.lld cannot load in the trixie build VM. renovate.json keeps it below 23
+  # until a 23.x release carries the fix (https://github.com/llvm/llvm-project/issues/215764).
   - name: llvm
     renovate: github-releases llvm/llvm-project
     extract-version: ^llvmorg-(?<version>[0-9]+\.[0-9]+\.[0-9]+)$
-    version: 23.1.2
+    version: 22.1.8
     url: https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/LLVM-${version}-Linux-ARM64.tar.xz
     verify: github-attestation llvm
     digest:
-      version: 23.1.2
-      sha256: 075da47cb832273717d4c7bad4b6b4848d7c154262e9ba0dcc0025426d4073f0
+      version: 22.1.8
+      sha256: 805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34
   # Kata's bootstrap kernel: the cold-start seed for the very first build VM, never fetched
   # again once the factory self-hosts. GitHub attests the asset as an immutable release.
   - name: kata
