@@ -17,7 +17,8 @@
     "The canonical Renovate configuration is .limen/renovate.json, content-pinned like the rest of .limen/, so a fix there reaches this repository with its next limen bump, in the bump's diff. extends reads it by this repository's own name (local>owner/name//.limen/renovate): Renovate refuses a relative reference in a repository's own config. The `renovate` rule writes that reference from the origin remote and rewrites it after a rename or a fork. Everything below is the project's own — overrides and additions go here, next to the reference.",
     "forkProcessing: Renovate skips forked repositories by default under an all-repositories App installation, and it skips them before reading any config beyond this file — so the setting cannot live in the shared preset, and cannot live in a renovate.json5 either: only the onboarding config file name, renovate.json, is read through the platform API at that point. Every repository that is a GitHub fork is silently never processed without it.",
     "gitIgnoredAuthors: the update-aqua-checksum workflow pushes a fix-up commit onto Renovate's branches; without this, Renovate treats the branch as human-modified and stops rebasing it. The org's App identity is the org's, so the array stays here (the `renovate` rule maintains it) rather than in the preset.",
-    "customManagers: the Debian build image in the .justfile, a docker digest pin Renovate moves itself; the tag is what it tracks, the digest is the pin. The kernel source, LLVM and Kata pins live in pins.yaml, which the shared preset watches and the checksum workflow refreshes. kernel_apt_snapshot stays a hand pin: a snapshot.debian.org timestamp has no datasource."
+    "customManagers: the Debian build image in the .justfile, a docker digest pin Renovate moves itself; the tag is what it tracks, the digest is the pin. The kernel source, LLVM and Kata pins live in pins.yaml, which the shared preset watches and the checksum workflow refreshes. kernel_apt_snapshot stays a hand pin: a snapshot.debian.org timestamp has no datasource.",
+    "packageRules, llvm: hold llvm/llvm-project below 23. Every 23.x Linux release so far links lld against ICU 70, which only Ubuntu 22.04 ships, so ld.lld cannot load in the trixie build VM and the kernel does not build (https://github.com/llvm/llvm-project/issues/215764). The fix is on LLVM's main; drop this rule once a 23.x release carries it and `just kernel` builds with that release."
   ],
   "extends": [
     "local>farcloser/ossein-kernel//.limen/renovate"
@@ -26,5 +27,16 @@
   "gitIgnoredAuthors": [
     "300983632+limen-ci-farcloser[bot]@users.noreply.github.com",
     "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
+  "packageRules": [
+    {
+      "matchDatasources": [
+        "github-releases"
+      ],
+      "matchDepNames": [
+        "llvm/llvm-project"
+      ],
+      "allowedVersions": "<23"
+    }
   ]
 }
