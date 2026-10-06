@@ -37,6 +37,7 @@ import (
 	"github.com/mycophonic/primordium/compress"
 	"github.com/mycophonic/primordium/filesystem"
 	"github.com/mycophonic/primordium/filesystem/dirs"
+	"github.com/mycophonic/primordium/filesystem/pathcheck"
 	"github.com/mycophonic/primordium/network/transporter"
 
 	"github.com/farcloser/ossein-kernel/internal/rootfs"
@@ -180,6 +181,20 @@ func run(cfg config) error {
 	client := newDownloadClient()
 	defer client.CloseIdleConnections()
 
+	// --out is the one path from the command line this writes (the kernel, and perf-arm64 next
+	// to it). Absolute before Validate: pathcheck refuses "." and "..", which a relative path
+	// legitimately carries.
+	out, err := filepath.Abs(cfg.Out)
+	if err != nil {
+		return fmt.Errorf("--out %q: %w", cfg.Out, err)
+	}
+
+	if err = pathcheck.Validate(out); err != nil {
+		return fmt.Errorf("--out: %w", err)
+	}
+
+	cfg.Out = out
+
 	// Validate cheap local inputs BEFORE resolveBootstrap, which may download a
 	// several-hundred-MB seed on a cold start — no point paying that to then fail on a typo'd
 	// --init/--kernel-config path.
@@ -188,7 +203,7 @@ func run(cfg config) error {
 		{"kernel config", cfg.KernelConfig},
 		{"kernel patches dir", cfg.KernelPatches},
 	} {
-		if _, err := os.Stat(input.path); err != nil {
+		if _, err = os.Stat(input.path); err != nil {
 			return fmt.Errorf("%s not found at %q: %w", input.what, input.path, err)
 		}
 	}
