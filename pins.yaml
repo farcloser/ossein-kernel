@@ -7,12 +7,12 @@ pins:
   - name: kernel
     renovate: github-tags gregkh/linux
     extract-version: ^v(?<version>[0-9]+\.[0-9]+(?:\.[0-9]+)?)$
-    version: 7.2.9
+    version: 7.2.10
     url: https://cdn.kernel.org/pub/linux/kernel/v${major}.x/linux-${version}.tar.xz
     verify: pgp-sha256sums https://cdn.kernel.org/pub/linux/kernel/v${major}.x/sha256sums.asc https://git.kernel.org/pub/scm/docs/kernel/pgpkeys.git/plain/keys/632D3A06589DA6B1.asc B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1
     digest:
-      version: 7.2.9
-      sha256: b4c5dfbe51a364a6c7f03869200f88c8e1f77403539005f14b7fc6bc91b8d8ba
+      version: 7.2.10
+      sha256: 2feaa70453e91f541be6a5c9078d8168e081af45a3d9718054850538cff2ebf3
   # An exact LLVM release tarball, not apt's clang-NN, which keeps only the newest build per
   # major. LLVM's own release workflow attests the asset (SLSA provenance).
   # Held on 22: every 23.x Linux release links lld against ICU 70, which only Ubuntu 22.04
