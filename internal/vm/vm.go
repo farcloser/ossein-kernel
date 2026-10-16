@@ -3,7 +3,7 @@
 // Package vm boots the kernel-build microVM directly on Virtualization.framework
 // (Code-Hex/vz), with NO dependency on ossein's container runtime. The guest is
 // kernel + a Debian rootfs disk (/dev/vda, read-only — the init pivots into a
-// tmpfs overlay) whose init is our own PID 1 (cmd/ossein-kernel/init) — it
+// tmpfs overlay) whose init is our own PID 1 (hack/ossein-kernel/init) — it
 // mounts the shares, runs build.sh, and powers off.
 //
 // Boot contract:

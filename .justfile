@@ -14,7 +14,7 @@ export CGO_ENABLED := '1'
 # is invisible to it. The explicit leg in `lint` below is that missing half: without it
 # PID 1 ships unanalyzed.
 guest_env := "CGO_ENABLED=0 GOOS=linux GOARCH=arm64"
-guest_pkgs := "./cmd/ossein-kernel/init/..."
+guest_pkgs := "./hack/ossein-kernel/init/..."
 
 # The FIRST recipe defined here becomes `just`'s default.
 lint: do::lint::default do::lint::go::default do::lint::go::deadcode
@@ -42,10 +42,21 @@ build-init:
     set -euo pipefail
     version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -tags='netgo,osusergo' \
-        -ldflags "-s -w -X main.version=${version}" -o build/ossein-init ./cmd/ossein-kernel/init
+        -ldflags "-s -w -X main.version=${version}" -o build/ossein-init ./hack/ossein-kernel/init
 
+# The kernel builder and the config helper are not products (book/releasing.md: a command
+# under cmd/ ships as a binary release, and these two are fetched by nobody), so they live
+# under hack/, where `do build go` (which builds cmd/*) does not look. This recipe
+# builds them itself with the same flags, into build/ where the kernel recipes call them.
+# ossein-kernel drives Virtualization.framework: cgo, and the entitlement below.
 build: build-init
-    CGO_ENABLED=1 just do build go
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p build
+    for name in ossein-kernel ikconfig; do
+        CGO_ENABLED=1 go build -trimpath -buildmode=pie -tags='netgo,osusergo' -ldflags '-s -w' \
+            -o "build/${name}" "./hack/${name}"
+    done
     codesign --force --sign - --timestamp=none --entitlements vz.entitlements build/ossein-kernel
 all: kernel kernel-debug kernel-nopatch
 
@@ -158,7 +169,7 @@ kernel-verify-config kernel="build/kernel-arm64": build
 # `ikconfig verify` diffs against to catch silent default-y drift, e.g. a new feature
 # riding in on a kernel-version bump. Run ONLY when you intentionally change the config, then
 # review + commit the diff (that diff IS the record of what the change turned on/off).
-# `ikconfig golden` and `ikconfig verify` share one extraction and normalization (cmd/ikconfig),
+# `ikconfig golden` and `ikconfig verify` share one extraction and normalization (hack/ikconfig),
 # so this snapshot and the drift diff can never normalize differently. Written via temp + rename so a
 # failed extraction cannot truncate the committed golden.
 kernel-golden kernel="build/kernel-arm64": build

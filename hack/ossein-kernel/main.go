@@ -4,7 +4,12 @@
 // on ossein itself: it boots a microVM directly on Virtualization.framework
 // (internal/vm), roots it on a Debian ext4 built host-side from the pinned OCI image
 // (internal/rootfs), runs the kernel's make via our own PID-1 init
-// (cmd/ossein-kernel/init), and collects kernel-arm64.
+// (hack/ossein-kernel/init), and collects kernel-arm64.
+//
+// It lives under hack/ as a tool of this repository's build, not a product: nothing
+// fetches it as a binary. Every input is a flag and build.sh is embedded, so it is
+// written to be split into a repository of its own, with the init embedded, the day
+// a second consumer appears.
 package main
 
 import (

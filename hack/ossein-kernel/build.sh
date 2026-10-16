@@ -1,5 +1,5 @@
 #!/bin/bash
-# Guest kernel build: runs inside the ossein build container by cmd/ossein-kernel: build the
+# Guest kernel build: runs inside the ossein build container by hack/ossein-kernel: build the
 # arm64 Image from the source + config staged at /kernel, drop it back there.
 #
 # TOOLCHAIN: clang + ld.lld + llvm-* with ThinLTO (CONFIG_LTO_CLANG_THIN), native arm64

@@ -29,8 +29,8 @@ Stock kernel configuration fragments live under kernel/config.
 
 Patches live under kernel/patches.
 
-The kernel builder logic is in cmd/ossein-kernel/main.go, and the actual in-container
-build script is in cmd/ossein-kernel/build.sh
+The kernel builder logic is in hack/ossein-kernel/main.go, and the actual in-container
+build script is in hack/ossein-kernel/build.sh
 
 ## Releasing
 
