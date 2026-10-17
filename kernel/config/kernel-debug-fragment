@@ -1,8 +1,8 @@
 # ossein guest kernel — DEBUG fragment. NOT shipped.
 #
 # kernel-fragment + in-guest observability. Build it alongside the ship kernel:
-#   just kernel-debug          -> build/kernel-arm64.debug
-#   OSSEIN_KERNEL=build/kernel-arm64.debug build/ossein run ...
+#   just kernel-debug          -> .build/kernel-arm64.debug
+#   OSSEIN_KERNEL=.build/kernel-arm64.debug .build/ossein run ...
 #
 # Why this exists: scheduler investigations need in-guest observability (CONFIG_SCHEDSTATS
 # for the wakeup counters, CONFIG_DEBUG_FS for /sys/kernel/debug/sched), but the ship kernel
