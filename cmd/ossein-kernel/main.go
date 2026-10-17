@@ -47,7 +47,7 @@ import (
 //go:embed build.sh
 var buildScript []byte
 
-const scratchDir = "build/kernel-scratch"
+const scratchDir = ".build/kernel-scratch"
 
 // initGuestPath is where internal/rootfs embeds the init and what the kernel init=
 // arg points at (kept in sync with internal/vm's cfg.Init).
@@ -120,7 +120,7 @@ type config struct {
 
 	KernelConfig  string `help:"Kconfig allowlist fragment merged onto tinyconfig (the 'which kernel' input)"     name:"kernel-config"                                                            required:"true"`
 	KernelPatches string `help:"directory of *.patch files applied (lexical order) to the pristine kernel source" name:"kernel-patches"                                                           required:"true"`
-	Out           string `default:"build/kernel-arm64"                                                            help:"output kernel path (only promoted here if it passes the boot smoke-test)" name:"out"`
+	Out           string `default:".build/kernel-arm64"                                                           help:"output kernel path (only promoted here if it passes the boot smoke-test)" name:"out"`
 	LocalVer      string `help:"kernel version tag"                                                               name:"localversion"                                                             required:"true"`
 
 	Init        string `help:"path to the cross-compiled guest init binary (linux/arm64)"                                   name:"init"          required:"true"`
@@ -639,7 +639,7 @@ func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, lab
 	}
 
 	// Ensure the destination dir exists — fetchFile is order-independent (the seed download
-	// runs before run()'s workdir MkdirAll, and build/ may have just been removed).
+	// runs before run()'s workdir MkdirAll, and .build/ may have just been removed).
 	if err := os.MkdirAll(filepath.Dir(dest), filesystem.DirPermissionsPrivate); err != nil {
 		return fmt.Errorf("create dest dir for %s: %w", label, err)
 	}
