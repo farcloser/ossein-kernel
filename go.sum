@@ -26,8 +26,8 @@ github.com/forkcloser/compress v0.2.0 h1:QuY1YwGAH65MlE6wqTYgaTuRZHawGHAAkyDnTEf
 github.com/forkcloser/compress v0.2.0/go.mod h1:l6qVHkGaivF0VWHoDtPj9ckxHS8r6QNF3AhMjy4dWus=
 github.com/forkcloser/xos v0.1.0 h1:0vfH2xxdCCDv6x7mYvnQ74zTElzb3wce+0wL+782HtE=
 github.com/forkcloser/xos v0.1.0/go.mod h1:XD7TJl5GzHaZbCBDKby6zDS9zQ+R6DAWclFskmRjAco=
-github.com/forkcloser/xz v1.1.1 h1:kXPlQmJB6C94rebgDIzVNYZetwiU6lDnCNavaWIeOOs=
-github.com/forkcloser/xz v1.1.1/go.mod h1:HHg5hb2lUURZe4jgnNIKLbBWjhX/I6kfVp79nthflu0=
+github.com/forkcloser/xz v1.1.2 h1:lTJexF5hDWc7gw1+d7/+iPLOYZ1jlBoD4kTfwz0dNTc=
+github.com/forkcloser/xz v1.1.2/go.mod h1:HHg5hb2lUURZe4jgnNIKLbBWjhX/I6kfVp79nthflu0=
 github.com/go-test/deep v1.1.1 h1:0r/53hagsehfO4bzD2Pgr/+RgHqhmf+k1Bpse2cTu1U=
 github.com/go-test/deep v1.1.1/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
