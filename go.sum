@@ -22,12 +22,12 @@ github.com/docker/docker-credential-helpers v0.9.8 h1:bIREROb7So6PRlq6KTtdS9MPEj
 github.com/docker/docker-credential-helpers v0.9.8/go.mod h1:v1S+hepowrQXITkEfw6o4+BMbGot02wiKpzWhGUZK6c=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57 h1:x5yxNrq8XffV/OoNUeFPM6hxHVi5OTspSTBxr/9pemg=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57/go.mod h1:GLo/8fDswSAniFG+BFIaiSPcK610jyzgEhWYPQwuQdw=
-github.com/forkcloser/compress v0.2.0 h1:QuY1YwGAH65MlE6wqTYgaTuRZHawGHAAkyDnTEf0yqU=
-github.com/forkcloser/compress v0.2.0/go.mod h1:l6qVHkGaivF0VWHoDtPj9ckxHS8r6QNF3AhMjy4dWus=
+github.com/forkcloser/compress v0.3.0 h1:PJt8VqfC+VKqb1KBVe2k16TeaAgR/PO4KfL/8jndp28=
+github.com/forkcloser/compress v0.3.0/go.mod h1:hdGZ20VGQYTs3OhGIBKqLHeUt8dorGayjk29/EXWrR8=
 github.com/forkcloser/xos v0.1.0 h1:0vfH2xxdCCDv6x7mYvnQ74zTElzb3wce+0wL+782HtE=
 github.com/forkcloser/xos v0.1.0/go.mod h1:XD7TJl5GzHaZbCBDKby6zDS9zQ+R6DAWclFskmRjAco=
-github.com/forkcloser/xz v1.1.1 h1:kXPlQmJB6C94rebgDIzVNYZetwiU6lDnCNavaWIeOOs=
-github.com/forkcloser/xz v1.1.1/go.mod h1:HHg5hb2lUURZe4jgnNIKLbBWjhX/I6kfVp79nthflu0=
+github.com/forkcloser/xz v1.1.2 h1:lTJexF5hDWc7gw1+d7/+iPLOYZ1jlBoD4kTfwz0dNTc=
+github.com/forkcloser/xz v1.1.2/go.mod h1:HHg5hb2lUURZe4jgnNIKLbBWjhX/I6kfVp79nthflu0=
 github.com/go-test/deep v1.1.1 h1:0r/53hagsehfO4bzD2Pgr/+RgHqhmf+k1Bpse2cTu1U=
 github.com/go-test/deep v1.1.1/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
@@ -55,8 +55,8 @@ github.com/mdlayher/packet v1.1.2 h1:3Up1NG6LZrsgDVn6X4L9Ge/iyRyxFEFD9o6Pr3Q1nQY
 github.com/mdlayher/packet v1.1.2/go.mod h1:GEu1+n9sG5VtiRE4SydOmX5GTwyyYlteZiFU+x0kew4=
 github.com/mdlayher/socket v0.4.1 h1:eM9y2/jlbs1M615oshPQOHZzj6R6wMT7bX5NPiQvn2U=
 github.com/mdlayher/socket v0.4.1/go.mod h1:cAqeGjoufqdxWkD7DkpyS+wcefOtmu5OQ8KuoJGIReA=
-github.com/mycophonic/primordium v0.15.0 h1:5ob8vr3tYUXK3x5oGZpWVH3ZnHbaniQjJzCBBJXvRM0=
-github.com/mycophonic/primordium v0.15.0/go.mod h1:Xj6jxfW9AQcacevOgFF6x0vmwTO30CJu986kurGWIu0=
+github.com/mycophonic/primordium v0.15.1 h1:Nh4IGRzbLr8rXxOaImX40P9HouHW0cbgrYatf0ps7rI=
+github.com/mycophonic/primordium v0.15.1/go.mod h1:o/fQjAj8b4OCW+UZfZBDuC3WBYRnOyx2bWv62qV3Rko=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
