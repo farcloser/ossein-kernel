@@ -44,3 +44,12 @@ golangci:
           # Placed before the module's own group: the sibling mycophonic
           # modules (primordium) keep a group of their own, as they have here.
           - prefix(github.com/mycophonic)
+
+# The two mains under cmd/ are tools of this repository's build, run from the
+# build directory by the kernel recipes and fetched by nobody: the product is
+# the kernel image (book/releasing.md, "a command under cmd/ either ships or
+# is declared unshipped").
+commands:
+  unshipped:
+    - ./cmd/ossein-kernel
+    - ./cmd/ikconfig

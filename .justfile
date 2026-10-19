@@ -18,15 +18,15 @@ guest_pkgs := "./cmd/ossein-kernel/init/..."
 
 # The FIRST recipe defined here becomes `just`'s default.
 lint: do::lint::default do::lint::go::default do::lint::go::deadcode
-    # build/tools/golangci-lint, on the build/golangci.yml it renders, is built
+    # $LIMEN_BUILD/tools/golangci-lint, on the $LIMEN_BUILD/golangci.yml it renders, is built
     # natively by the shared leg this recipe depends on; run it, not a PATH one.
-    {{ guest_env }} build/tools/golangci-lint run -c build/golangci.yml {{ guest_pkgs }}
+    {{ guest_env }} "$LIMEN_BUILD/tools/golangci-lint" run -c "$LIMEN_BUILD/golangci.yml" {{ guest_pkgs }}
 
 # The security lane plus the init's half of it: the shared vuln leg scans what
-# builds natively, and the init is linux-only. build/tools/govulncheck is built
+# builds natively, and the init is linux-only. $LIMEN_BUILD/tools/govulncheck is built
 # by that leg.
 security: do::security::default
-    {{ guest_env }} build/tools/govulncheck {{ guest_pkgs }}
+    {{ guest_env }} "$LIMEN_BUILD/tools/govulncheck" {{ guest_pkgs }}
 
 fix: do::fix::default do::fix::go::default
 test:
@@ -42,11 +42,11 @@ build-init:
     set -euo pipefail
     version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -tags='netgo,osusergo' \
-        -ldflags "-s -w -X main.version=${version}" -o build/ossein-init ./cmd/ossein-kernel/init
+        -ldflags "-s -w -X main.version=${version}" -o "$LIMEN_BUILD/ossein-init" ./cmd/ossein-kernel/init
 
 build: build-init
     CGO_ENABLED=1 just do build go
-    codesign --force --sign - --timestamp=none --entitlements vz.entitlements build/ossein-kernel
+    codesign --force --sign - --timestamp=none --entitlements vz.entitlements "$LIMEN_BUILD/ossein-kernel"
 all: kernel kernel-debug kernel-nopatch
 
 # The kernel source, LLVM toolchain and Kata seed are pinned in pins.yaml and read inside
@@ -78,13 +78,13 @@ kernel_patches := "kernel/patches"
 # build.sh reject empty) so a build is never silently unlabeled — always identifiable.
 kernel_localversion := "ossein"
 
-ossein_init := "build/ossein-init"
+ossein_init := LIMEN_BUILD / "ossein-init"
 
 # Boots a real VM: the binary MUST be codesigned with the vz entitlement (see `build`).
 # `release-kernel` overrides localversion with the tag's flavor.rev so uname -r equals the
 # release tag.
 kernel localversion=kernel_localversion: build
-    build/ossein-kernel \
+    "$LIMEN_BUILD/ossein-kernel" \
         --init "{{ ossein_init }}" \
         --image "{{ kernel_build_image }}" \
         --debian-suite "{{ kernel_debian_suite }}" \
@@ -100,19 +100,19 @@ kernel localversion=kernel_localversion: build
         --kata-sha256 "$(limen pins get kata sha256)"
     @just kernel-verify-config
 
-# Build the SAME kernel with kernel/patches/ NOT applied → build/kernel-arm64.nopatch.
+# Build the SAME kernel with kernel/patches/ NOT applied → .build/kernel-arm64.nopatch.
 # The A/B baseline for ossein's `just bench-perf`: identical source + config + toolchain pins,
 # the patch set is the ONLY variable, so any delta in the bench matrix is ours and nothing
 # else. Implemented by pointing --kernel-patches at an empty dir (the flag is required, and an
 # empty dir is the honest way to say "none" — build.sh's glob then applies nothing).
 # NOTE: --out doubles as the self-host bootstrap, so the first run of this (no .nopatch
-# kernel yet) falls back to the Kata seed; it's cached in build/kernel-scratch afterwards.
+# kernel yet) falls back to the Kata seed; it's cached in .build/kernel-scratch afterwards.
 kernel-nopatch: build
-    mkdir -p build/no-patches
-    build/ossein-kernel \
+    mkdir -p "$LIMEN_BUILD/no-patches"
+    "$LIMEN_BUILD/ossein-kernel" \
         --init "{{ ossein_init }}" \
-        --out "build/kernel-arm64.nopatch" \
-        --kernel-patches "build/no-patches" \
+        --out "$LIMEN_BUILD/kernel-arm64.nopatch" \
+        --kernel-patches "$LIMEN_BUILD/no-patches" \
         --image "{{ kernel_build_image }}" \
         --debian-suite "{{ kernel_debian_suite }}" \
         --apt-snapshot "{{ kernel_apt_snapshot }}" \
@@ -125,17 +125,17 @@ kernel-nopatch: build
         --kata-url "$(limen pins get kata url)" \
         --kata-sha256 "$(limen pins get kata sha256)"
 
-# Build the ship kernel + in-guest observability -> build/kernel-arm64.debug. NOT shipped:
+# Build the ship kernel + in-guest observability -> .build/kernel-arm64.debug. NOT shipped:
 # use it to investigate, then throw it away. merge_config takes both fragments in order, so
 # the debug one only ADDS (see kernel/config/kernel-debug-fragment for what and why).
-#   OSSEIN_KERNEL=ossein-kernel/build/kernel-arm64.debug ossein run --cpus 4 ...  (+ schedstats=enable)
+#   OSSEIN_KERNEL=ossein-kernel/.build/kernel-arm64.debug ossein run --cpus 4 ...  (+ schedstats=enable)
 # Skips kernel-verify-config: the golden describes the SHIP kernel, and this one deliberately differs.
 kernel-debug: build
-    bash kernel/merge-fragments.sh {{ kernel_config }} kernel/config/kernel-debug-fragment > build/kernel-debug.merged
-    build/ossein-kernel \
+    bash kernel/merge-fragments.sh {{ kernel_config }} kernel/config/kernel-debug-fragment > "$LIMEN_BUILD/kernel-debug.merged"
+    "$LIMEN_BUILD/ossein-kernel" \
         --init "{{ ossein_init }}" \
-        --out "build/kernel-arm64.debug" \
-        --kernel-config "build/kernel-debug.merged" \
+        --out "$LIMEN_BUILD/kernel-arm64.debug" \
+        --kernel-config "$LIMEN_BUILD/kernel-debug.merged" \
         --kernel-patches "{{ kernel_patches }}" \
         --image "{{ kernel_build_image }}" \
         --debian-suite "{{ kernel_debian_suite }}" \
@@ -151,8 +151,8 @@ kernel-debug: build
 # Assert the SHIPPED kernel carries our intended config: extract the embedded IKCONFIG
 # and fail on drift (merge_config + olddefconfig silently revert EXPERT-gated or
 # arch-unreachable fragment lines).
-kernel-verify-config kernel="build/kernel-arm64": build
-    build/ikconfig verify "{{ kernel }}" --golden kernel/config/kernel-golden
+kernel-verify-config kernel=(LIMEN_BUILD / "kernel-arm64"): build
+    "$LIMEN_BUILD/ikconfig" verify "{{ kernel }}" --golden kernel/config/kernel-golden
 
 # Regenerate kernel/config/kernel-golden — the committed snapshot of every DECIDED symbol that
 # `ikconfig verify` diffs against to catch silent default-y drift, e.g. a new feature
@@ -161,11 +161,11 @@ kernel-verify-config kernel="build/kernel-arm64": build
 # `ikconfig golden` and `ikconfig verify` share one extraction and normalization (cmd/ikconfig),
 # so this snapshot and the drift diff can never normalize differently. Written via temp + rename so a
 # failed extraction cannot truncate the committed golden.
-kernel-golden kernel="build/kernel-arm64": build
+kernel-golden kernel=(LIMEN_BUILD / "kernel-arm64"): build
     #!/usr/bin/env bash
     set -euo pipefail
     tmp="$(mktemp kernel/config/.kernel-golden.XXXXXX)"; trap 'rm -f "$tmp"' EXIT
-    build/ikconfig golden "{{ kernel }}" > "$tmp"
+    "$LIMEN_BUILD/ikconfig" golden "{{ kernel }}" > "$tmp"
     [ -s "$tmp" ] || { echo "ERROR: empty golden — no IKCONFIG in {{ kernel }}?" >&2; exit 1; }
     mv "$tmp" kernel/config/kernel-golden
     trap - EXIT
@@ -185,7 +185,7 @@ kernel-golden kernel="build/kernel-arm64": build
 maintainer_identity_regexp := '^(142371135\+[^@]+@users\.noreply\.github\.com|apostasie@farcloser\.world)$'
 maintainer_oidc_issuer := "https://github.com/login/oauth"
 
-# Cut a kernel release: (re)build + boot-verify, then publish build/kernel-arm64 + perf-arm64
+# Cut a kernel release: (re)build + boot-verify, then publish .build/kernel-arm64 + perf-arm64
 # to a GitHub release with checksums, a keyless cosign (sigstore) signature over the checksums,
 # and notes pinning every build input so the blob is reproducible + auditable from the release
 # alone. Tag shape (distro-kernel style): <upstream-version>-{{ kernel_localversion }}.<rev>
@@ -233,9 +233,9 @@ release-kernel tag:
     just kernel "$localversion"
 
     # --- stage, checksum, sign (keyless cosign over the checksum file covers both blobs) ---
-    rel=build/release
+    rel="$LIMEN_BUILD/release"
     rm -rf "$rel"; mkdir -p "$rel"
-    cp build/kernel-arm64 build/perf-arm64 "$rel/"
+    cp "$LIMEN_BUILD/kernel-arm64" "$LIMEN_BUILD/perf-arm64" "$rel/"
     ( cd "$rel"
       sha256sum kernel-arm64 perf-arm64 > SHA256SUMS
       cosign sign-blob --yes --bundle SHA256SUMS.cosign.bundle SHA256SUMS

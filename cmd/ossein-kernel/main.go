@@ -47,7 +47,22 @@ import (
 //go:embed build.sh
 var buildScript []byte
 
-const scratchDir = "build/kernel-scratch"
+// buildDir is the checkout's output directory: LIMEN_BUILD as the recipes export
+// it (limen's main.just, the one spelling of the name), .build/ when run by hand
+// from the checkout root.
+func buildDir() string {
+	if dir := os.Getenv("LIMEN_BUILD"); dir != "" {
+		return dir
+	}
+
+	return ".build"
+}
+
+// scratchDir holds the build's reusable state: the kernel source and LLVM, the
+// Debian root image and the smoke-test workdir.
+func scratchDir() string {
+	return filepath.Join(buildDir(), "kernel-scratch")
+}
 
 // initGuestPath is where internal/rootfs embeds the init and what the kernel init=
 // arg points at (kept in sync with internal/vm's cfg.Init).
@@ -120,7 +135,7 @@ type config struct {
 
 	KernelConfig  string `help:"Kconfig allowlist fragment merged onto tinyconfig (the 'which kernel' input)"     name:"kernel-config"                                                            required:"true"`
 	KernelPatches string `help:"directory of *.patch files applied (lexical order) to the pristine kernel source" name:"kernel-patches"                                                           required:"true"`
-	Out           string `default:"build/kernel-arm64"                                                            help:"output kernel path (only promoted here if it passes the boot smoke-test)" name:"out"`
+	Out           string `default:"${build_dir}/kernel-arm64"                                                     help:"output kernel path (only promoted here if it passes the boot smoke-test)" name:"out"`
 	LocalVer      string `help:"kernel version tag"                                                               name:"localversion"                                                             required:"true"`
 
 	Init        string `help:"path to the cross-compiled guest init binary (linux/arm64)"                                   name:"init"          required:"true"`
@@ -144,6 +159,7 @@ func main() {
 
 	kong.Parse(&cli,
 		kong.Name("ossein-kernel"),
+		kong.Vars{"build_dir": buildDir()},
 		kong.Description("Build the ossein guest kernel (standalone; no ossein runtime)."),
 		kong.UsageOnError(),
 	)
@@ -224,7 +240,7 @@ func run(cfg config) error {
 	// build.env go in, kernel-arm64 + perf-arm64 + status come out. The build SCRATCH
 	// (/kbuild) is NOT virtio-fs: the guest init mounts it as tmpfs (a real fs the guest
 	// kernel owns), so size the VM's memory to fit the build.
-	workdir := filepath.Join(scratchDir, "kernel")
+	workdir := filepath.Join(scratchDir(), "kernel")
 	if err = stageWorkdir(cfg, workdir); err != nil {
 		return err
 	}
@@ -386,7 +402,7 @@ func smokeTest(ctx context.Context, kernelPath, rootImage string) error {
 	slog.InfoContext(ctx, "boot smoke-test: booting the freshly-built kernel", "kernel", kernelPath)
 
 	// A throwaway /kernel share whose build.sh just proves userland runs. No network.
-	smokeDir := filepath.Join(scratchDir, "smoke")
+	smokeDir := filepath.Join(scratchDir(), "smoke")
 	if err := os.MkdirAll(smokeDir, filesystem.DirPermissionsPrivate); err != nil {
 		return fmt.Errorf("create smoke dir: %w", err)
 	}
@@ -468,8 +484,8 @@ func readStatus(statusPath string) (int, error) {
 // image ref and the embedded init binary (so rebuilding the init invalidates the
 // cache). Per-boot clones are made from it so the pristine copy is never mutated.
 func prepareRootfs(ctx context.Context, cfg config) (string, error) {
-	rootImage := filepath.Join(scratchDir, "debian-rootfs.ext4")
-	stamp := filepath.Join(scratchDir, ".debian-rootfs-ref")
+	rootImage := filepath.Join(scratchDir(), "debian-rootfs.ext4")
+	stamp := filepath.Join(scratchDir(), ".debian-rootfs-ref")
 
 	key, err := rootfsCacheKey(cfg)
 	if err != nil {
@@ -485,7 +501,7 @@ func prepareRootfs(ctx context.Context, cfg config) (string, error) {
 		}
 	}
 
-	if err := os.MkdirAll(scratchDir, filesystem.DirPermissionsPrivate); err != nil {
+	if err := os.MkdirAll(scratchDir(), filesystem.DirPermissionsPrivate); err != nil {
 		return "", fmt.Errorf("create scratch dir: %w", err)
 	}
 
@@ -639,7 +655,7 @@ func fetchFile(ctx context.Context, client *http.Client, url, dest, wantSHA, lab
 	}
 
 	// Ensure the destination dir exists — fetchFile is order-independent (the seed download
-	// runs before run()'s workdir MkdirAll, and build/ may have just been removed).
+	// runs before run()'s workdir MkdirAll, and .build/ may have just been removed).
 	if err := os.MkdirAll(filepath.Dir(dest), filesystem.DirPermissionsPrivate); err != nil {
 		return fmt.Errorf("create dest dir for %s: %w", label, err)
 	}
@@ -751,7 +767,7 @@ func (sr *stallReader) stop() { sr.timer.Stop() }
 func prepareLLVM(ctx context.Context, client *http.Client, cfg config) (string, error) {
 	// Check the extraction stamp FIRST: if the toolchain is already extracted for this exact
 	// sha, we don't need the tarball at all — skip the multi-second re-hash fetchFile does.
-	llvmDir := filepath.Join(scratchDir, "llvm")
+	llvmDir := filepath.Join(scratchDir(), "llvm")
 
 	stamp := filepath.Join(llvmDir, ".ossein-llvm-sha")
 
@@ -762,7 +778,7 @@ func prepareLLVM(ctx context.Context, client *http.Client, cfg config) (string, 
 		return llvmDir, nil
 	}
 
-	tarball := cachePath(filepath.Join(scratchDir, "llvm.tar.xz"), cfg.LLVMSHA)
+	tarball := cachePath(filepath.Join(scratchDir(), "llvm.tar.xz"), cfg.LLVMSHA)
 	if err := fetchFile(ctx, client, cfg.LLVMURL, tarball, cfg.LLVMSHA, "LLVM toolchain"); err != nil {
 		return "", err
 	}
@@ -994,14 +1010,14 @@ func resolveBootstrap(ctx context.Context, client *http.Client, cfg config) (str
 }
 
 func fetchSeedKernel(ctx context.Context, client *http.Client, url, wantSHA string) (string, error) {
-	cache := filepath.Join(scratchDir, "bootstrap-kernel-arm64")
+	cache := filepath.Join(scratchDir(), "bootstrap-kernel-arm64")
 	if fi, err := os.Stat(cache); err == nil && fi.Size() > 0 {
 		slog.InfoContext(ctx, "bootstrap: cached kernel", "path", cache)
 
 		return cache, nil
 	}
 
-	tarball := cachePath(filepath.Join(scratchDir, "seed-kernel.tar.zst"), wantSHA)
+	tarball := cachePath(filepath.Join(scratchDir(), "seed-kernel.tar.zst"), wantSHA)
 	if err := fetchFile(ctx, client, url, tarball, wantSHA, "Seed kernel"); err != nil {
 		return "", err
 	}
