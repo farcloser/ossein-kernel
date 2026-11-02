@@ -80,7 +80,7 @@ rust_env := '''
     if command -v cygpath >/dev/null 2>&1; then
         RUSTUP_HOME="$(cygpath -m "$RUSTUP_HOME")"; CARGO_HOME="$(cygpath -m "$CARGO_HOME")"
     fi
-    export RUSTUP_AUTO_INSTALL=1 RUSTUP_INIT_SKIP_PATH_CHECK=yes
+    export RUSTUP_INIT_SKIP_PATH_CHECK=yes
     if [ ! -f rust-toolchain.toml ]; then
         echo "rust-toolchain.toml is missing: the toolchain is pinned there, an exact version with its components and targets (book/rust.md)." >&2
         exit 1
@@ -90,9 +90,49 @@ rust_env := '''
             echo "rustup-init is not on the hermetic PATH: pin rust-lang/rustup in .hermetic/hermetic.yaml (just do tools add local,rust-lang/rustup <version>, book/rust.md)." >&2
             exit 1
         fi
-        rustup-init -y -q --no-modify-path --no-update-default-toolchain --default-toolchain none --profile minimal
+        # stdout is rustup-init's welcome ("Rust is installed now. Great!", the
+        # PATH advice): nothing a lane reports; its errors stay on stderr.
+        rustup-init -y -q --no-modify-path --no-update-default-toolchain --default-toolchain none --profile minimal >/dev/null
     fi
     export PATH="$LIMEN_BUILD/cargo/bin:$PATH"
+    # Windows: rustup's default host is the msvc triple, whose host builds
+    # (build scripts, proc-macros, the tests) link through the runner image's
+    # Visual Studio, which nothing pins. The GNU triples link through pinned
+    # tools instead, so the pinned toolchain is the whole build: x64 through
+    # the toolchain's own rust-mingw; arm64, whose gnullvm host ships no
+    # linker (it expects a MinGW clang on PATH), through the pinned zig by
+    # way of cargo-zigbuild's `zig cc`, the linker the cross builds use,
+    # which maps the libraries rustc asks for (msvcrt) to zig's. Read from
+    # rustup rather than from uname or the environment, which lie under
+    # emulation on arm64 (book/windows.md); idempotent, so a cached rustup
+    # from before this line is moved too.
+    case "$(rustup show 2>/dev/null | sed -n 's/^Default host: //p')" in
+        x86_64-pc-windows-msvc) rustup set default-host x86_64-pc-windows-gnu >/dev/null ;;
+        aarch64-pc-windows-msvc) rustup set default-host aarch64-pc-windows-gnullvm >/dev/null ;;
+    esac
+    if [ "$(rustup show 2>/dev/null | sed -n 's/^Default host: //p')" = aarch64-pc-windows-gnullvm ]; then
+        for tool in zig cargo-zigbuild; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+                echo "$tool is not on the hermetic PATH: the aarch64 Windows host links through the project's pinned zig and cargo-zigbuild (ziglang/zig and rust-cross/cargo-zigbuild in .hermetic/hermetic.yaml)." >&2
+                exit 1
+            fi
+        done
+        mkdir -p "$LIMEN_BUILD/zig"
+        linker="$LIMEN_BUILD/zig/aarch64-pc-windows-gnullvm-linker.cmd"
+        printf '@echo off\r\nsetlocal DisableDelayedExpansion\r\n"%s" zig cc -- -target aarch64-windows-gnu %%*\r\n' "$(cygpath -w "$(command -v cargo-zigbuild)")" > "$linker"
+        linker_native="$(cygpath -m "$linker")"
+        export CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_LINKER="$linker_native"
+        export ZIG_GLOBAL_CACHE_DIR="$LIMEN_BUILD/zig/global" ZIG_LOCAL_CACHE_DIR="$LIMEN_BUILD/zig/local"
+        export CARGO_ZIGBUILD_CACHE_DIR="$LIMEN_BUILD/zig/cargo-zigbuild"
+    fi
+    # The toolchain rust-toolchain.toml names, installed explicitly when the
+    # file's toolchain is not there yet (a first run, a channel bump): the
+    # proxies would auto-install it under RUSTUP_AUTO_INSTALL, with a warning
+    # on every first lane, and a lane runs no step it did not state.
+    if ! RUSTUP_AUTO_INSTALL=0 rustup which cargo >/dev/null 2>&1; then
+        # --no-self-update: a pinned rustup asks nobody for a newer one.
+        rustup toolchain install --no-self-update
+    fi
 '''
 
 # Every Go-built tool the recipes run — the Go-source analyzers and the rest
