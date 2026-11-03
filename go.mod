@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/Code-Hex/vz/v3 v3.8.0
-	github.com/alecthomas/kong v1.16.1
+	github.com/alecthomas/kong v1.17.0
 	github.com/diskfs/go-diskfs v1.9.4
 	github.com/forkcloser/xz v1.1.2
 	github.com/google/go-containerregistry v0.22.1
