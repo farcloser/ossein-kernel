@@ -11,8 +11,8 @@ pins:
     url: https://cdn.kernel.org/pub/linux/kernel/v${major}.x/linux-${version}.tar.xz
     verify: pgp-sha256sums https://cdn.kernel.org/pub/linux/kernel/v${major}.x/sha256sums.asc https://git.kernel.org/pub/scm/docs/kernel/pgpkeys.git/plain/keys/632D3A06589DA6B1.asc B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1
     digest:
-      version: 7.3.1
-      sha256: fa595aad93734f829c963c2a90ef7c3673224fd7fdae7b49406e397cde2de231
+      version: 7.3.3
+      sha256: 79c66dde66cd96877fcde8f7d36aec946b1f423d2b97b5a7b1751b75c764f3d1
   # An exact LLVM release tarball, not apt's clang-NN, which keeps only the newest build per
   # major. LLVM's own release workflow attests the asset (SLSA provenance).
   # Held on 22: every 23.x Linux release links lld against ICU 70, which only Ubuntu 22.04
