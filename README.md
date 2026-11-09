@@ -39,16 +39,17 @@ locally: the build boots a real VM on Virtualization.framework, which no stock C
 can, so there is no release workflow.
 
 ```
-just release-kernel X.Y.Z-ossein.N
+just release-kernel vX.Y.Z.N
 ```
 
-Run it from a clean tree. `X.Y.Z` must be the upstream version pinned in
-`kernel_source_url` (the recipe refuses anything else); bump `N` for a rebuild of the same
-upstream (config, patch or toolchain change) and reset it to 1 on a source bump. No leading
-`v`: a `v`-prefixed, hyphen-suffixed tag parses as a SemVer pre-release, sorts before
-`X.Y.Z`, and loses GitHub's "Latest". The recipe builds and boot-verifies the kernel, signs
-the checksums keyless with cosign (a browser opens for the OIDC login), creates a signed
-git tag, pushes it, and publishes `kernel-arm64`, `perf-arm64`, `SHA256SUMS` and
+Run it from a clean tree. The tag is the rebuild tag of limen's book (`book/forks.md`):
+`X.Y.Z` must be the upstream version pinned in `pins.yaml` (the recipe refuses anything
+else); `N` is the rebuild of that upstream (config, patch or toolchain change), from 1, reset
+to 1 on a source bump. No `-suffix`: a hyphen-suffixed tag parses as a SemVer pre-release,
+sorts before `X.Y.Z`, and loses GitHub's "Latest"; a fourth segment sorts after. The kernel's
+`uname -r` names the release as `X.Y.Z-ossein.N`. The recipe builds and boot-verifies the
+kernel, signs the checksums keyless with cosign (a browser opens for the OIDC login), creates
+a signed git tag, pushes it, and publishes `kernel-arm64`, `perf-arm64`, `SHA256SUMS` and
 `SHA256SUMS.cosign.bundle` to a GitHub release.
 
 Consumers verify a release with:

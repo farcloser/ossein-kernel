@@ -76,13 +76,14 @@ kernel_patches := "kernel/patches"
 # banner). Pass the BARE tag (no leading dash) — ossein-kernel prepends the "-" (a leading
 # dash here would be parsed as a flag by kong). REQUIRED all the way down (ossein-kernel +
 # build.sh reject empty) so a build is never silently unlabeled — always identifiable.
+# `release-kernel` appends the release's rebuild number (ossein.N).
 kernel_localversion := "ossein"
 
 ossein_init := LIMEN_BUILD / "ossein-init"
 
 # Boots a real VM: the binary MUST be codesigned with the vz entitlement (see `build`).
-# `release-kernel` overrides localversion with the tag's flavor.rev so uname -r equals the
-# release tag.
+# `release-kernel` overrides localversion with ossein.N, N the tag's rebuild number, so
+# uname -r names the release (7.1.3-ossein.3 for v7.1.3.3).
 kernel localversion=kernel_localversion: build
     "$LIMEN_BUILD/ossein-kernel" \
         --init "{{ ossein_init }}" \
@@ -188,14 +189,13 @@ maintainer_oidc_issuer := "https://github.com/login/oauth"
 # Cut a kernel release: (re)build + boot-verify, then publish .build/kernel-arm64 + perf-arm64
 # to a GitHub release with checksums, a keyless cosign (sigstore) signature over the checksums,
 # and notes pinning every build input so the blob is reproducible + auditable from the release
-# alone. Tag shape (distro-kernel style): <upstream-version>-{{ kernel_localversion }}.<rev>
-# (e.g. 7.1.3-ossein.1) — the version MUST match the pinned kernel source; bump <rev> for a
-# rebuild of the same upstream (config/patch/toolchain change), reset to 1 on a source bump.
-# NO leading "v": a v-prefixed hyphen-suffixed tag parses as a SemVer PRE-release (sorts BEFORE
-# X.Y.Z), which loses GitHub's "Latest" and misleads Renovate/sort -V. The git tag is signed
-# (your key signs the intent, as in the shared release lane); cosign opens a browser for the
-# OIDC flow.
-# just release-kernel 7.1.3-ossein.1
+# alone. Tag shape: the rebuild tag of limen's book (book/forks.md), vX.Y.Z.N — X.Y.Z the
+# upstream kernel version, which MUST match the pinned kernel source, N the rebuild of that
+# upstream (config/patch/toolchain change), from 1, reset to 1 on a source bump. No -suffix:
+# a hyphen-suffixed tag is a SemVer pre-release, sorts BEFORE X.Y.Z and loses GitHub's
+# "Latest"; a fourth segment sorts after. The git tag is signed (your key signs the intent, as
+# in the shared release lane); cosign opens a browser for the OIDC flow.
+# just release-kernel v7.1.3.1
 release-kernel tag:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -203,19 +203,20 @@ release-kernel tag:
     upstream="$(basename "$(limen pins get kernel url)" | sed -E 's/^linux-(.+)\.tar\..*$/\1/')"
 
     # --- pre-flight (cheap; fail before the long build and before any tag/push) ---
-    # Tag is X.Y.Z-<localversion>.rev and X.Y.Z equals the pinned upstream source version:
-    # a release can never disagree with the kernel it ships.
-    if ! printf '%s' "$tag" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-{{ kernel_localversion }}\.[0-9]+$'; then
-        echo "tag '$tag' must be X.Y.Z-{{ kernel_localversion }}.rev (e.g. ${upstream}-{{ kernel_localversion }}.1)" >&2
+    # Tag is vX.Y.Z.N and X.Y.Z equals the pinned upstream source version: a release can
+    # never disagree with the kernel it ships.
+    if ! printf '%s' "$tag" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+        echo "tag '$tag' must be vX.Y.Z.N (e.g. v${upstream}.1)" >&2
         exit 2
     fi
-    if [ "$(printf '%s' "$tag" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/')" != "$upstream" ]; then
+    rev="${tag##*.}"
+    if [ "${tag#v}" != "${upstream}.${rev}" ]; then
         echo "tag version != pinned kernel source $upstream — move the kernel pin in pins.yaml or fix the tag" >&2
         exit 2
     fi
-    # The kernel's baked-in localversion IS the tag minus the upstream version, so uname -r
-    # equals the release tag (7.1.3-ossein.3), self-identifying at runtime.
-    localversion="${tag#"${upstream}"-}"
+    # The kernel's baked-in localversion carries the rebuild number, so uname -r names the
+    # release (7.1.3-ossein.3 for v7.1.3.3), self-identifying at runtime.
+    localversion="{{ kernel_localversion }}.${rev}"
     # A dirty tree means the pins/commit recorded in the notes would not match what shipped.
     if [ -n "$(git status --porcelain)" ]; then
         echo "working tree is dirty — commit or stash before releasing:" >&2
@@ -223,13 +224,13 @@ release-kernel tag:
         exit 1
     fi
     if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-        echo "tag $tag already exists — pick the next .N (or: git tag -d $tag)" >&2
+        echo "tag $tag already exists — pick the next N (or: git tag -d $tag)" >&2
         exit 1
     fi
     gh auth status >/dev/null 2>&1 || { echo "gh is not authenticated — run 'gh auth login'" >&2; exit 1; }
 
     # --- build + boot-verify (kernel recipe: build, smoke-test, verify-config) ---
-    # Pass the tag-derived localversion so the shipped kernel's uname -r == the release tag.
+    # Pass the tag-derived localversion so the shipped kernel's uname -r names the release.
     just kernel "$localversion"
 
     # --- stage, checksum, sign (keyless cosign over the checksum file covers both blobs) ---
