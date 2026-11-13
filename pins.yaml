@@ -14,7 +14,9 @@ pins:
       version: 7.3.3
       sha256: 79c66dde66cd96877fcde8f7d36aec946b1f423d2b97b5a7b1751b75c764f3d1
   # An exact LLVM release tarball, not apt's clang-NN, which keeps only the newest build per
-  # major. LLVM's own release workflow attests the asset (SLSA provenance).
+  # major. LLVM's own release workflow attests the asset (SLSA provenance), and the pin names
+  # that workflow as the signer: the owner alone would accept an attestation from any
+  # workflow of any llvm repository.
   # Held on 22: every 23.x Linux release links lld against ICU 70, which only Ubuntu 22.04
   # ships, so ld.lld cannot load in the trixie build VM. renovate.json keeps it below 23
   # until a 23.x release carries the fix (https://github.com/llvm/llvm-project/issues/215764).
@@ -23,7 +25,7 @@ pins:
     extract-version: ^llvmorg-(?<version>[0-9]+\.[0-9]+\.[0-9]+)$
     version: 22.1.8
     url: https://github.com/llvm/llvm-project/releases/download/llvmorg-${version}/LLVM-${version}-Linux-ARM64.tar.xz
-    verify: github-attestation llvm
+    verify: github-attestation llvm/llvm-project llvm/llvm-project/.github/workflows/release-binaries.yml
     digest:
       version: 22.1.8
       sha256: 805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34
