@@ -12,6 +12,7 @@ pins:
     verify: pgp-sha256sums https://cdn.kernel.org/pub/linux/kernel/v${major}.x/sha256sums.asc https://git.kernel.org/pub/scm/docs/kernel/pgpkeys.git/plain/keys/632D3A06589DA6B1.asc B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1
     digest:
       version: 7.3.4
+      source: e9c1399c5e785d05a15534def93be274bcd09922e99469ed0de0371f589022f1
       sha256: b11b6df8295e8e991ff040b71aaa4994a8b55caa23b6b092907f195b5840fd1f
   # An exact LLVM release tarball, not apt's clang-NN, which keeps only the newest build per
   # major. LLVM's own release workflow attests the asset (SLSA provenance), and the pin names
@@ -28,6 +29,7 @@ pins:
     verify: github-attestation llvm/llvm-project llvm/llvm-project/.github/workflows/release-binaries.yml
     digest:
       version: 22.1.8
+      source: 8636f8929c9d2d358b161a6c807e54d90da1c04924c52682389c766fba3343f2
       sha256: 805efad2bb91cb4967fa569e0881d10c0f69c04461cf671cccbae19f547acc34
   # Kata's bootstrap kernel: the cold-start seed for the very first build VM, never fetched
   # again once the factory self-hosts. GitHub attests the asset as an immutable release.
@@ -38,4 +40,5 @@ pins:
     verify: github-release-asset kata-containers/kata-containers
     digest:
       version: 4.3.1
+      source: 82ad32160c80cc7f2af12bec79e817c17a52d19ff84e9cb7ebb24b16fcaebccb
       sha256: 2c5bf7cde334ad5307d482f45cceda496f91c9b6b96f5278c47f4f4eac1bbae6
