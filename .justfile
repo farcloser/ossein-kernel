@@ -149,6 +149,32 @@ kernel-debug: build
         --kata-url "$(limen pins get kata url)" \
         --kata-sha256 "$(limen pins get kata sha256)"
 
+# Build the debug kernel + KASAN and the VM/VFS/list assertions -> .build/kernel-arm64.kasan.
+# NOT shipped: it is for finding who writes to memory it does not own (see
+# kernel/config/kernel-kasan-fragment for what each check reports and what it costs). The
+# fragments stack: ship, then debug, then kasan, each merged over the last.
+#   OSSEIN_KERNEL=ossein-kernel/.build/kernel-arm64.kasan ossein run --memory 8GiB ...
+# Give the guest a fixed --memory: an eighth of its RAM becomes shadow memory at boot.
+# Skips kernel-verify-config, as kernel-debug does and for the same reason.
+kernel-kasan: build
+    bash kernel/merge-fragments.sh {{ kernel_config }} kernel/config/kernel-debug-fragment > "$LIMEN_BUILD/kernel-debug.merged"
+    bash kernel/merge-fragments.sh "$LIMEN_BUILD/kernel-debug.merged" kernel/config/kernel-kasan-fragment > "$LIMEN_BUILD/kernel-kasan.merged"
+    "$LIMEN_BUILD/ossein-kernel" \
+        --init "{{ ossein_init }}" \
+        --out "$LIMEN_BUILD/kernel-arm64.kasan" \
+        --kernel-config "$LIMEN_BUILD/kernel-kasan.merged" \
+        --kernel-patches "{{ kernel_patches }}" \
+        --image "{{ kernel_build_image }}" \
+        --debian-suite "{{ kernel_debian_suite }}" \
+        --apt-snapshot "{{ kernel_apt_snapshot }}" \
+        --llvm-url "$(limen pins get llvm url)" \
+        --llvm-sha256 "$(limen pins get llvm sha256)" \
+        --localversion "{{ kernel_localversion }}-kasan" \
+        --source-url "$(limen pins get kernel url)" \
+        --source-sha256 "$(limen pins get kernel sha256)" \
+        --kata-url "$(limen pins get kata url)" \
+        --kata-sha256 "$(limen pins get kata sha256)"
+
 # Assert the SHIPPED kernel carries our intended config: extract the embedded IKCONFIG
 # and fail on drift (merge_config + olddefconfig silently revert EXPERT-gated or
 # arch-unreachable fragment lines).
