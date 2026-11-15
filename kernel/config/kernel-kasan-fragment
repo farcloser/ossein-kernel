@@ -1,0 +1,50 @@
+# ossein guest kernel — KASAN fragment. NOT shipped.
+#
+# kernel-fragment + kernel-debug-fragment + the checks that catch a write to memory its writer
+# does not own, at the write, with the writer's stack. Build it beside the others:
+#   just kernel-kasan          -> .build/kernel-arm64.kasan
+#   OSSEIN_KERNEL=.build/kernel-arm64.kasan .build/ossein run --memory 8GiB ...
+#
+# Why this exists: slab debugging (kernel-debug-fragment, slab_debug=FZPU) finds damage when
+# the damaged object is next allocated or freed, and names the victim. On 2026-11-15 it found
+# whole slab pages zeroed while in use (farcloser/ossein-kernel#214), minutes after the fact
+# and with nothing to say who wrote the zeros. These checks run at the access instead.
+#
+# What it costs, and why none of it may ride in the ship kernel: every load and store is
+# checked (lib/Kconfig.kasan puts the slowdown at about three times), and an eighth of the
+# guest's RAM goes to shadow memory AT BOOT. Give the guest a fixed size (--memory 8GiB): a
+# guest sized to the whole host pays that eighth of the whole host.
+#
+# The recipe merges this over the debug fragment with kernel/merge-fragments.sh, so every line
+# here is a full override and must survive olddefconfig (build.sh checks each one).
+
+# --- KASAN, generic mode, inline checks ---
+# Reports a use after free, an out-of-bounds access and a write into a slab red zone, each with
+# the stack of the access and the stacks that allocated and freed the object. For memory freed
+# through call_rcu() it also keeps the stack that queued the free, which is the one that names
+# who dropped the last reference. Generic is the mode that needs no hardware support. Inline is
+# the faster of the two instrumentations and the larger image; size is not a concern for a
+# kernel that is never shipped.
+CONFIG_KASAN=y
+CONFIG_KASAN_GENERIC=y
+CONFIG_KASAN_INLINE=y
+# Kernel stacks are vmalloc memory (VMAP_STACK), and VMAP_STACK refuses to coexist with a
+# software KASAN that does not cover vmalloc. arm64 selects this whenever KASAN is on; it is
+# stated so the dependency is on the page.
+CONFIG_KASAN_VMALLOC=y
+
+# --- page allocator and VM assertions ---
+# Checks the page descriptor on every allocation and free ("Bad page state"): a page handed
+# out while something still owns it, or freed twice, is reported there and not when its
+# contents are next read. The same checks can be had on any kernel with check_pages=on; here
+# they come with the VM_BUG_ON assertions as well.
+CONFIG_DEBUG_VM=y
+
+# --- VFS assertions ---
+# The inode reference-count and state assertions (VFS_BUG_ON_INODE): an iput() on an inode
+# that is already being freed stops at that call.
+CONFIG_DEBUG_VFS=y
+
+# --- list assertions ---
+# A list_add()/list_del() on a corrupted list reports the corruption instead of spreading it.
+CONFIG_DEBUG_LIST=y
