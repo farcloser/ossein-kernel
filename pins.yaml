@@ -11,9 +11,9 @@ pins:
     url: https://cdn.kernel.org/pub/linux/kernel/v${major}.x/linux-${version}.tar.xz
     verify: pgp-sha256sums https://cdn.kernel.org/pub/linux/kernel/v${major}.x/sha256sums.asc https://git.kernel.org/pub/scm/docs/kernel/pgpkeys.git/plain/keys/632D3A06589DA6B1.asc B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1
     digest:
-      version: 7.3.5
-      source: 2270ad5cd475f58e63abc629b793b2fa43833df19ff8aa2fa5980d056d8fbfdf
-      sha256: 8f293f83d54f0b7b9be56863ebc5e4ea79d73e530b4ae55c572be97ef39f0990
+      version: 7.3.6
+      source: 80d62bce31caab8042ca428a65c41e58742e2753d918ed2c245455a98b08eec6
+      sha256: 8183d475a76a0faffa92d6cd500af421f589dfd0300a0f1060bb875e11d45723
   # An exact LLVM release tarball, not apt's clang-NN, which keeps only the newest build per
   # major. LLVM's own release workflow attests the asset (SLSA provenance), and the pin names
   # that workflow as the signer: the owner alone would accept an attestation from any
